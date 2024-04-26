@@ -74,6 +74,7 @@ public class Customer : MonoBehaviour
             CashRegister cashRegister = ShopData.instance.GetActiveRegister();
             if(cashRegister == null) {
                 Debug.Log("Nie ma ¿adnej otwartej kasy!");
+                UIManager.textUI.UpdateText("There is no open cash register", 2f);
                 yield return new WaitForSeconds(0.5f);
             }
             else{
@@ -107,7 +108,7 @@ public class Customer : MonoBehaviour
     private void OnDestroy()
     {
         for(int i = 0; i < productsTaken.Count; i++) {
-            productsTaken[i].Destroy();
+            productsTaken[i].RemoveProductFromGame(true);
         }
     }
 }

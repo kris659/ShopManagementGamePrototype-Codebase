@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
 
-public class Decoration : MonoBehaviour, IBuildable
+public class NonFunctionalBuilding : MonoBehaviour, IBuildable
 {
     public static void Spawn(int shelfTypeIndex, Vector3 position, Quaternion rotation)
     {        

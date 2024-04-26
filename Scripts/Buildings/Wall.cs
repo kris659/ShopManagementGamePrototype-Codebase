@@ -4,10 +4,13 @@ using UnityEngine;
 
 public class Wall: MonoBehaviour, IBuildable
 {
+    [HideInInspector]
+    public int typeIndex;
     public static void Spawn(int wallTypeIndex, Vector3 position, Quaternion rotation)
-    {
+    {      
         GameObject wallGO = Instantiate(SOData.wallsList[wallTypeIndex].Prefab, position, rotation);
         Wall wall = wallGO.GetComponent<Wall>();
+        wall.typeIndex = wallTypeIndex;
         ShopData.instance.AddWall(wall);
     }
     public bool CanBuildHere(Vector3 position, Quaternion rotation)

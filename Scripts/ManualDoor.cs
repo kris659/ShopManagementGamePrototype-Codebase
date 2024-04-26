@@ -13,7 +13,15 @@ public class ManualDoor : MonoBehaviour, IInteractable
     Collider[] doorsColliders;
     [SerializeField] Vector3[] doorsRotations;
 
-    public string textToDisplay { get; } = "E - open doors";
+    public string textToDisplay
+    {
+        get {
+            if (!areDoorsOpen)
+                return "E - open doors";
+            else
+                return "E - close doors";
+        }
+    }
 
     private void Start()
     {

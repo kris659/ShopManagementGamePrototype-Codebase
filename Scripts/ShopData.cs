@@ -136,8 +136,7 @@ public class ShopData : MonoBehaviour
 
         for (int i = 0; i < wallsList.Count; i++) {
             Wall wall = wallsList[i];
-            Debug.Log(wallSaveData.Length + " " + wallsList.Count);
-            wallSaveData[i] = new WallSaveData(wall.transform.position, wall.transform.rotation, 0);
+            wallSaveData[i] = new WallSaveData(wall.transform.position, wall.transform.rotation, wall.typeIndex);
         }
         return wallSaveData;
     }

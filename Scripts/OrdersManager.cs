@@ -14,7 +14,6 @@ public class OrdersManager : MonoBehaviour
     public List<int> discountThresholds;    
     public List<int> discountPercents;
 
-    bool isUIOpen = false;
     BoxCollider palletCheckCollider;
     private void Awake()
     {
@@ -40,7 +39,7 @@ public class OrdersManager : MonoBehaviour
 
     public void SpawnProducts(int productTypeIndex, int amountTotal)
     {
-        GameObject pallet = null;// = Instantiate(palletPrefab, palletSpawnPositions[i].position, Quaternion.identity);
+        GameObject pallet = null;
         int parentIndex = productTypesPositionParentIndex[productTypeIndex];
         Transform parent = productsInBoxSpawnPositionsParent[parentIndex];
 
@@ -48,18 +47,17 @@ public class OrdersManager : MonoBehaviour
             if(i%boxSpawnPosition.Count == 0){
                 pallet = SpawnNewPallet();
                 if (pallet == null) {
-                    Debug.LogError("Nie ma miejsca na palete");
+                    UIManager.textUI.UpdateText("Not enough space for new pallet", 3f);
                     return;
                 }
             }
             
-            Product boxProduct = new Product(boxTypeIndex, pallet.transform.TransformPoint(boxSpawnPosition[i].localPosition), pallet.transform.rotation);
-            ProductsData.instance.products.Add(boxProduct);
+            Container container = new Container(boxTypeIndex, true, pallet.transform.TransformPoint(boxSpawnPosition[i].localPosition), pallet.transform.rotation, false);
             
             int amountToSpawn = Mathf.Min(amountTotal, parent.childCount);
             amountTotal -= amountToSpawn;
 
-            boxProduct.InitContainer(productTypeIndex, amountToSpawn, parent);
+            container.CreateProductsInContainer(productTypeIndex, amountToSpawn, parent);
         }
        
     }
@@ -75,17 +73,21 @@ public class OrdersManager : MonoBehaviour
             Vector3 center = palletSpawnPositions[i].position + palletCheckCollider.center + palletCheckCollider.transform.localPosition;
             Vector3 halfExtents = palletCheckCollider.size / 2f;
             Collider[] hitColliders = Physics.OverlapBox(center, halfExtents, transform.rotation);
-            Debug.Log(hitColliders.Length);
+            //Debug.Log(hitColliders.Length);
             bool shouldContinue = false;
+            List<GameObject> palletGOList = new List<GameObject>();
             foreach (Collider collider in hitColliders){
-                if(collider.transform.GetComponentInParent<Pallet>() == null) {
+                Pallet pallet = collider.transform.GetComponentInParent<Pallet>();
+                if (pallet == null) {
                     shouldContinue = true; 
                     break;
                 }
+                if(!palletGOList.Contains(pallet.gameObject))
+                    palletGOList.Add(pallet.gameObject);
             }
             if (!shouldContinue) {
-                for(int j = 0; j < hitColliders.Length; j++) {
-                    Destroy(hitColliders[i].gameObject);
+                for(int j = 0; j < palletGOList.Count; j++) {
+                    Destroy(palletGOList[i]);
                 }
                 return Instantiate(palletPrefab, palletSpawnPositions[i].position, palletSpawnPositions[i].rotation);
             }

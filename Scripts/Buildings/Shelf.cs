@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class Shelf : MonoBehaviour, IBuildable
@@ -30,25 +29,27 @@ public class Shelf : MonoBehaviour, IBuildable
         triggerHandler.triggerExit = OnShelfTriggerExit;
     }
     public void AddProduct(Product product)
-    {        
-        products.Add(product);
-        ShopData.instance.UpdateShelfStatus(this);
+    {
+        if (!products.Contains(product)) {
+            products.Add(product);
+            ShopData.instance.UpdateShelfStatus(this);
+        }
     }
 
     public void TakeProduct(Product product)
     {
-        products.Remove(product);
-        ShopData.instance.UpdateShelfStatus(this);
+        if (products.Contains(product)) {
+            products.Remove(product);
+            ShopData.instance.UpdateShelfStatus(this);
+        }
     }
     public Product TakeRandomProduct()
     {
-        //Debug.Log("Customer takes product");
         if(products.Count > 0) {
             int index = Random.Range(0, products.Count);
             Product product = products[index];
-            products.RemoveAt(index);
+            product.DestroyGameObject();
             ShopData.instance.UpdateShelfStatus(this);
-            product.OnCustomerTake();
             return product;
         }            
         return null;
@@ -56,11 +57,13 @@ public class Shelf : MonoBehaviour, IBuildable
 
     private void OnShelfTriggerEnter(Collider other)
     {
-        //Debug.Log(other.name + "Entered the shelf trigger");
+        if (other.TryGetComponent(out ProductGO productGO)) {
+            productGO.product.shelf = this;
+            AddProduct(productGO.product);
+        }
     }
     private void OnShelfTriggerExit(Collider other)
     {
-        //Debug.Log(other.name + "Left the shelf trigger");
         if(other.TryGetComponent(out ProductGO productGO)){
             productGO.product.shelf = null;
             TakeProduct(productGO.product);

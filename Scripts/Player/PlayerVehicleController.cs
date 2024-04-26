@@ -13,7 +13,6 @@ public class PlayerVehicleController : MonoBehaviour
     {
         IVehicle vehicle = vehicleObject.GetComponent<IVehicle>();
         this.vehicle = vehicle;
-
         vehicleFPSCamera.transform.SetParent(vehicle.PlayerPosition);
         vehicleFPSCamera.transform.position = vehicle.PlayerPosition.position;
 

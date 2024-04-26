@@ -9,14 +9,14 @@ public class SaveData
     public ShelfSaveData[] shelvesData;
     public WallSaveData[] wallsData;
     public RegisterSaveData[] registersData;
-    public ProductsSaveData[] productsData;
-    public VehiclesSaveData[] vehiclesData;
-    public int hour;
-    public int minute;
+    public ProductSaveData[] productsData;
+    public ContainerSaveData[] containersData;
+    public VehicleSaveData[] vehiclesData;
+    
 
     public int[] storageManagerProducts;
 
-    public SaveData(PlayerSaveData playerData,  ShelfSaveData[] shelvesData, WallSaveData[] wallsData, RegisterSaveData[] registersData, ProductsSaveData[] productsData, VehiclesSaveData[] vehiclesData)
+    public SaveData(PlayerSaveData playerData,  ShelfSaveData[] shelvesData, WallSaveData[] wallsData, RegisterSaveData[] registersData, ProductSaveData[] productsData, ContainerSaveData[] containersData, VehicleSaveData[] vehiclesData)
     {
         this.playerData = playerData;
         this.shelvesData = shelvesData;
@@ -24,10 +24,8 @@ public class SaveData
         this.registersData = registersData;
         this.productsData = productsData;
         this.vehiclesData = vehiclesData;
-        hour = TimeManager.instance.Hour;
-        minute = TimeManager.instance.Minute;
-    }
-    
+        this.containersData = containersData;
+    }    
 }
 
 [System.Serializable]
@@ -36,12 +34,16 @@ public class PlayerSaveData
     public Vector3 position;
     public int playerMoney;
     public int vehicleIndex;
+    public int hour;
+    public int minute;
 
-    public PlayerSaveData(Vector3 position, int playerMoney, int vehicleIndex)
+    public PlayerSaveData(Vector3 position, int playerMoney, int vehicleIndex, int hour, int minute)
     {
         this.position = position;
         this.playerMoney = playerMoney;
         this.vehicleIndex = vehicleIndex;
+        this.hour = hour;
+        this.minute = minute;
     }
 }
 
@@ -90,41 +92,56 @@ public class RegisterSaveData
 }
 
 [System.Serializable]
-public class ProductsSaveData
+public class ProductSaveData
 {
     public int productTypeIndex;
+    public bool isPhysxSpawned;
     public Vector3 position;
     public Quaternion rotation;
 
-    public bool isTakenByCustomer;
-    public int shelfIndex;
-
-    public ProductsSaveData[] productsInContainer;
-    public Vector3[] productsInContainerPositions;
-    public Vector3[] productsInContainerRotations;
-
-    public ProductsSaveData(Vector3 position, Quaternion rotation, int productTypeIndex, bool isTakenByCustomer, int shelfIndex,
-        ProductsSaveData[] productsInContainer, Vector3[] productsInContainerPositions, Vector3[] productsInContainerRotations)
+    public ProductSaveData(int productTypeIndex, bool isPhysxSpawned, Vector3 position, Quaternion rotation)
     {
         this.productTypeIndex = productTypeIndex;
+        this.isPhysxSpawned = isPhysxSpawned;
         this.position = position;
         this.rotation = rotation;
-        this.isTakenByCustomer = isTakenByCustomer;
-        this.shelfIndex = shelfIndex;
-        this.productsInContainer = productsInContainer;
+    }
+}
+
+[System.Serializable]
+public class ContainerSaveData
+{
+    public int containerTypeIndex;
+    public bool isPhysxSpawned;
+    public bool isOpen;
+    public Vector3 position;
+    public Quaternion rotation;
+
+    public int[] productsInContainerIndexes;
+    public Vector3[] productsInContainerPositions;
+    public Quaternion[] productsInContainerRotations;
+
+    public ContainerSaveData(int containerTypeIndex, bool isPhysxSpawned, bool isOpen, Vector3 position, Quaternion rotation, int[] productsInContainerIndexes, Vector3[] productsInContainerPositions, Quaternion[] productsInContainerRotations)
+    {
+        this.containerTypeIndex = containerTypeIndex;
+        this.isPhysxSpawned = isPhysxSpawned;
+        this.isOpen = isOpen;
+        this.position = position;
+        this.rotation = rotation;
+        this.productsInContainerIndexes = productsInContainerIndexes;
         this.productsInContainerPositions = productsInContainerPositions;
         this.productsInContainerRotations = productsInContainerRotations;
     }
 }
 
 [System.Serializable]
-public class VehiclesSaveData
+public class VehicleSaveData
 {
     public int prefabIndex;
     public Vector3 position;
     public Quaternion rotation;
 
-    public VehiclesSaveData(Vector3 position, Quaternion rotation, int prefabIndex)
+    public VehicleSaveData(Vector3 position, Quaternion rotation, int prefabIndex)
     {
         this.prefabIndex = prefabIndex;
         this.position = position;

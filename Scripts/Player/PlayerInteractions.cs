@@ -165,6 +165,7 @@ public class PlayerInteractions : MonoBehaviour
     public void SetPlayerPosition(Vector3 position)
     {
         playerRigidbody.transform.position = position;
+        Physics.SyncTransforms();
     }
     public Vector3 GetPlayerPosition()
     {

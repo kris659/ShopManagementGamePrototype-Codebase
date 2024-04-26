@@ -7,7 +7,7 @@ using System.Linq;
 public static class SaveFilesManager
 {
     static string saveDirectoryPath = Path.Combine(Application.persistentDataPath,"Saves");
-    static bool shouldLoadDefault = false;
+    static string startingSaveDirectoryPath = Path.Combine(Application.streamingAssetsPath,"Saves");
 
     public static void Save(string saveName, SaveData saveData)
     {
@@ -15,11 +15,16 @@ public static class SaveFilesManager
         Save(saveData, savePath);
     }
 
-    public static void CreateDefault(SaveData saveData)
+    public static void CreateStartingSave(string saveName, SaveData saveData)
     {
-        string savePath = Path.Combine(saveDirectoryPath, "Default", "Deafault_Data");
+        string savePath = Path.Combine(startingSaveDirectoryPath, saveName);
         Debug.Log(savePath);
         Save(saveData, savePath);
+    }
+    public static SaveData LoadStartingSave(string saveName)
+    {
+        string path = Path.Combine(startingSaveDirectoryPath, saveName);
+        return LoadFromFile(path);
     }
 
     static void Save(SaveData saveData, string savePath)
@@ -48,9 +53,7 @@ public static class SaveFilesManager
 
     public static SaveData Load(string saveName)
     {
-        string path;
-        if (shouldLoadDefault) path = Path.Combine(saveDirectoryPath, "Default", "Deafault_Data");
-        else path = Path.Combine(saveDirectoryPath, saveName);
+        string path = Path.Combine(saveDirectoryPath, saveName);
         return LoadFromFile(path);
     }
 

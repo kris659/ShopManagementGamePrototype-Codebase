@@ -1,20 +1,25 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.AI.Navigation;
 using UnityEngine;
 
 public class SavingManager : MonoBehaviour
 {
     [SerializeField] private bool shouldLoadOnStart = false;
-    [SerializeField] private string saveNameLoadOnStart;
+    public string startingSaveName;
+    [SerializeField] private int startingMoney;
+    [SerializeField] private NavMeshSurface navMeshSurface;
     SavingUI savingUI;
     
-    private void Start()
+    private IEnumerator Start()
     {
         savingUI = UIManager.savingUI;
         savingUI.Init(this);
 
+        yield return new WaitForEndOfFrame();
         if (shouldLoadOnStart)
-            Load(saveNameLoadOnStart);
+            Load(startingSaveName, true);
     }
     void Update()
     {
@@ -25,32 +30,104 @@ public class SavingManager : MonoBehaviour
                 savingUI.OpenUI();
     }
 
-    public void Save(string saveName)
+    public void Save(string saveName, bool isStartingSave = false)
     {
-        SaveFilesManager.Save(saveName, CreateSaveData());
+        if (isStartingSave)
+            SaveFilesManager.CreateStartingSave(saveName, CreateSaveData(isStartingSave));        
+        else
+            SaveFilesManager.Save(saveName, CreateSaveData(isStartingSave));
     }
-    public void Load(string saveName)
+    public void Load(string saveName, bool isStartingSave = false)
     {
         ClearScene();
-        SaveData saveData = SaveFilesManager.Load(saveName);
-        ShopData.instance.LoadFromSaveData(saveData);
-        ProductsData.instance.LoadFromSaveData(saveData.productsData);
-        VehicleManager.instance.LoadFromSaveData(saveData.vehiclesData);
-        PlayerData.instance.LoadFromSaveData(saveData.playerData);
-        TimeManager.instance.SetTime(saveData.hour, saveData.minute);
+        SaveData saveData;
+        if (isStartingSave)
+            saveData = SaveFilesManager.LoadStartingSave(saveName);
+        else
+            saveData = SaveFilesManager.Load(saveName);
+
+        try { ShopData.instance.LoadFromSaveData(saveData); }
+        catch (Exception e) { Debug.LogError("Failed loading ShopData " + e.Message); }
+        //ProductsData.instance.LoadFromSaveData(saveData.productsData, saveData.containersData);
+        try { ProductsData.instance.LoadFromSaveData(saveData.productsData, saveData.containersData); }
+        catch (Exception e) { Debug.LogError("Failed loading ProductsData " + e.Message); }
+
+        try { VehicleManager.instance.LoadFromSaveData(saveData.vehiclesData);}
+        catch (Exception e) { Debug.LogError("Failed loading VehiclesData " + e.Message); }
+
+        try { PlayerData.instance.LoadFromSaveData(saveData.playerData); }
+        catch (Exception e) { Debug.LogError("Failed loading PlayerData " + e.Message); }
+        
+        navMeshSurface.BuildNavMesh();
     }
 
 
-    private SaveData CreateSaveData()
+    private SaveData CreateSaveData(bool isStartingSave)
     {
-        PlayerSaveData playerSaveData = PlayerData.instance.GetPlayerSaveData();
-        ShelfSaveData[] shelfSaveData = ShopData.instance.GetShelfSaveData();
-        RegisterSaveData[] registerSaveData = ShopData.instance.GetRegisterSaveData();
-        WallSaveData[] wallSaveData = ShopData.instance.GetWallSaveData();
-        ProductsSaveData[] productSaveData = ProductsData.instance.GetProductsSaveData();
-        VehiclesSaveData[] vehiclesSaveData = VehicleManager.instance.GetVehiclesSaveData();
+        PlayerSaveData playerSaveData;
+        ShelfSaveData[] shelfSaveData;
+        RegisterSaveData[] registerSaveData;
+        WallSaveData[] wallSaveData;
+        ProductSaveData[] productSaveData;
+        ContainerSaveData[] containerSaveData;
+        VehicleSaveData[] vehiclesSaveData;
+        
+        try {
+            playerSaveData = PlayerData.instance.GetPlayerSaveData();
+            if (isStartingSave) {
+                playerSaveData.playerMoney = startingMoney;
+                playerSaveData.hour = 12;
+                playerSaveData.minute = 0;
+            }
+        }
+        catch (Exception e){
+            Debug.LogError("Failed creating PlayerSaveData: " + e.Message);
+            playerSaveData = new PlayerSaveData(Vector3.zero, 1000, 0, 12, 0);
+        }
+        try {
+            shelfSaveData = ShopData.instance.GetShelfSaveData();
+        }
+        catch (Exception e) {
+            Debug.LogError("Failed creating ShelvesSaveData: " + e.Message);
+            shelfSaveData = new ShelfSaveData[0];
+        }
+        try {
+            registerSaveData = ShopData.instance.GetRegisterSaveData();
+        }
+        catch (Exception e) {
+            Debug.LogError("Failed creating RegistersSaveData: " + e.Message);
+            registerSaveData = new RegisterSaveData[0];
+        }
+        try {
+            wallSaveData = ShopData.instance.GetWallSaveData();
+        }
+        catch (Exception e) {
+            Debug.LogError("Failed creating WallsSaveData: " + e.Message);
+            wallSaveData = new WallSaveData[0];
+        }
+        try {
+            productSaveData = ProductsData.instance.GetProductsSaveData();
+        }
+        catch (Exception e) {
+            Debug.LogError("Failed creating ProductsSaveData: " + e.Message);
+            productSaveData = new ProductSaveData[0];
+        }
+        try {
+            containerSaveData = ProductsData.instance.GetContainersSaveData();
+        }
+        catch (Exception e) {
+            Debug.LogError("Failed creating ContainersSaveData: " + e.Message);
+            containerSaveData = new ContainerSaveData[0];
+        }
+        try {
+            vehiclesSaveData = VehicleManager.instance.GetVehiclesSaveData();
+        }
+        catch (Exception e) {
+            Debug.LogError("Failed creating VehiclesSaveData: " + e.Message);
+            vehiclesSaveData = new VehicleSaveData[0];
+        }
 
-        SaveData saveData = new SaveData(playerSaveData, shelfSaveData, wallSaveData, registerSaveData, productSaveData, vehiclesSaveData);
+        SaveData saveData = new SaveData(playerSaveData, shelfSaveData, wallSaveData, registerSaveData, productSaveData, containerSaveData, vehiclesSaveData);
         return saveData;
     }
 

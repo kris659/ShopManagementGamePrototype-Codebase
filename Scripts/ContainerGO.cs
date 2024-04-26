@@ -3,14 +3,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Container : MonoBehaviour, IInteractable
+public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
 {
     [SerializeField] bool canBeClosed = false;
     public bool isOpen = false;
     [SerializeField] float openingTime = 0.5f;
 
     [SerializeField] private GameObject[] containerDoors;
-    [SerializeField] private GameObject[] containerOpenDoorsPositions;
     private Vector3[] containerClosedDoorsPositions;
     [SerializeField] private Vector3[] containerOpenDoorsRotations;
 
@@ -18,12 +17,10 @@ public class Container : MonoBehaviour, IInteractable
     [SerializeField] private GameObject containerClosedCollider;
 
     [SerializeField] private BoxCollider containerTrigger;
-    private bool isOpeningOrClosing = false;
+    public bool isOpeningOrClosing = false;
 
-    List<Product> productsInTriggerList = new List<Product>();
-    List<Vector3> productsInTriggerPositionsList = new List<Vector3>();
-    List<Vector3> productsInTriggerRotationsList = new List<Vector3>();
-
+    [HideInInspector]
+    public Container container;
     public string textToDisplay { 
         get {
             if (!isOpen)
@@ -32,17 +29,33 @@ public class Container : MonoBehaviour, IInteractable
                 return "E - close box";
         } }
 
+    public IPickable pickable => container;
 
-    public void Init(bool isOpen, List<Product> productsInTriggerList, List<Vector3> productsInTriggerPositionsList, List<Vector3> productsInTriggerRotationsList)
+    public bool isPhysixSpawned;
+
+    public static ContainerGO Spawn(bool isOnlyVisual, Vector3 position, Quaternion rotation, Transform parent, Container container, bool isColliderActive = false)
     {
-        this.productsInTriggerList = productsInTriggerList;
-        this.productsInTriggerPositionsList = productsInTriggerPositionsList;
-        this.productsInTriggerRotationsList = productsInTriggerRotationsList;
+        GameObject containerGO;
+        if (isOnlyVisual) {
+            containerGO = Instantiate(container.productType.visualPrefab, position, rotation, parent);
+            if (isColliderActive) {
+                containerGO.GetComponent<Collider>().enabled = true;
+            }            
+        }
+        else 
+            containerGO = Instantiate(container.productType.prefab, position, rotation, parent);
+        ContainerGO containerGOScript = containerGO.GetComponent<ContainerGO>();
+        containerGOScript.container = container;
+        containerGOScript.Init(false);
+        containerGOScript.isPhysixSpawned = !isOnlyVisual;
+        return containerGOScript;
+    }
 
+    public void Init(bool isOpen)
+    {
         this.isOpen = isOpen;
         if (!canBeClosed) {
             this.isOpen = true;
-            SpawnProducts();
         }
 
         DOTween.Init();
@@ -69,9 +82,7 @@ public class Container : MonoBehaviour, IInteractable
             return;
         float localOpeningTime = openInstantly ? 0: openingTime;
         for (int i = 0; i < containerDoors.Length; i++) {
-            //containerDoors[i].transform.DOMove(containerOpenDoorsTransforms[i].transform.position, localOpeningTime);
             containerDoors[i].transform.DOLocalRotate(containerOpenDoorsRotations[i], localOpeningTime, RotateMode.LocalAxisAdd);
-
         }
         StartCoroutine(SetColliderActive(localOpeningTime, true));
     }
@@ -81,7 +92,6 @@ public class Container : MonoBehaviour, IInteractable
             return;
         float localClosingTime = closeInstantly ? 0 : openingTime;
         for (int i = 0; i < containerDoors.Length; i++) {
-            //containerDoors[i].transform.DOMove(containerClosedDoorsTransforms[i].transform.position, localClosingTime);
             containerDoors[i].transform.DOLocalRotate(-containerOpenDoorsRotations[i], localClosingTime, RotateMode.LocalAxisAdd);
         }
         StartCoroutine(SetColliderActive(localClosingTime, false));
@@ -99,43 +109,29 @@ public class Container : MonoBehaviour, IInteractable
         yield return new WaitForSeconds(duration);
         isOpen = desiredState;
         if (!desiredState) {
-            UpdateProductsInContainerData();
-            DestroyProductsInTrigger();
+            container.UpdateProductsInContainer();
+            container.DestroyProductsInTrigger();
             containerOpenCollider.SetActive(isOpen);
             containerClosedCollider.SetActive(!isOpen);
-        }        
+        }
         isOpeningOrClosing = false;
     }
 
-    public void GetProductsInContainerData(out List<Product> productsInContainer, out List<Vector3> productsPositions, out List<Vector3> productsRotations)
+    public void GetProductsInTrigger(out List<Product> productsInTriggerList, out List<Vector3> productsInTriggerPositionsList, out List<Vector3> productsInTriggerRotationsList)
     {
-        //if (isOpen)
-        //    UpdateProductsInContainerData();
-        if (isOpen)
-            CloseContainer(true);
-
-        productsInContainer = this.productsInTriggerList;
-        productsPositions = this.productsInTriggerPositionsList;
-        productsRotations = this.productsInTriggerRotationsList;
-    }
-
-    private void UpdateProductsInContainerData()
-    {
-        productsInTriggerList.Clear();
-        productsInTriggerPositionsList.Clear();
-        productsInTriggerRotationsList.Clear();
+        productsInTriggerList = new List<Product>();
+        productsInTriggerPositionsList = new List<Vector3>();
+        productsInTriggerRotationsList = new List<Vector3>();
 
         Vector3 center = transform.position + containerTrigger.center + containerTrigger.transform.localPosition;
         Vector3 halfExtents = containerTrigger.size / 2f;
         Collider[] hitColliders = Physics.OverlapBox(center, halfExtents, transform.rotation, ProductsData.instance.productsLayerMask);
 
         for (int i = 0; i < hitColliders.Length; i++) {
-            Debug.Log(hitColliders[i].transform.name);
-
             if (hitColliders[i].transform.TryGetComponent(out ProductGO productGO)) {
                 if (productGO.gameObject != gameObject && !productsInTriggerList.Contains(productGO.product)) {
                     productsInTriggerList.Add(productGO.product);
-                    productsInTriggerPositionsList.Add(productGO.transform.position - transform.position);
+                    productsInTriggerPositionsList.Add(transform.InverseTransformPoint(productGO.transform.position));
                     productsInTriggerRotationsList.Add(productGO.transform.eulerAngles - transform.eulerAngles);
                 }
             }
@@ -148,25 +144,16 @@ public class Container : MonoBehaviour, IInteractable
                     }
                 }
             }
-        }
-        //Debug.Log("Pick up: " + productsInTriggerList.Count);
+        }        
     }
 
     private void SpawnProducts()
     {
-        //Debug.Log("Place: " + productsInTriggerList.Count);
-
-        for (int i = 0; i < productsInTriggerList.Count; i++) {
-            Vector3 position = transform.position + productsInTriggerPositionsList[i];
-            Quaternion rotation = Quaternion.Euler(transform.eulerAngles + productsInTriggerRotationsList[i]);
-            productsInTriggerList[i].Place(position, rotation, null);
-        }
-    }
-
-    private void DestroyProductsInTrigger()
-    {
-        foreach (Product product in productsInTriggerList) {
-            product.CloseInContainer();
+        container.GetProductsInContainerData(out List<Product> productsInContainerList, out List<Vector3> productsInContainerPositionsList, out List<Vector3> productsInContainerRotationsList);
+        for (int i = 0; i < productsInContainerList.Count; i++) {
+            Vector3 position = transform.TransformPoint(productsInContainerPositionsList[i]);
+            Quaternion rotation = Quaternion.Euler(transform.eulerAngles + productsInContainerRotationsList[i]);
+            productsInContainerList[i].Place(position, rotation, null);
         }
     }
 }

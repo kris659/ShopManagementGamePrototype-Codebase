@@ -9,6 +9,9 @@ public class SOData : MonoBehaviour
     [SerializeField] private ProductSO[] _productsList;
     public static ProductSO[] productsList;
 
+    [SerializeField] private ContainerSO[] _containersList;
+    public static ContainerSO[] containersList;
+
     public static List<ProductSO> sellableProductsList = new List<ProductSO>();
 
     [SerializeField] private ShelfSO[] _shelvesList;
@@ -36,6 +39,7 @@ public class SOData : MonoBehaviour
     void Awake()
     {
         productsList = _productsList;
+        containersList = _containersList;
         shelvesList = _shelvesList;
         registersList = _registersList;
         wallsList = _wallsList;

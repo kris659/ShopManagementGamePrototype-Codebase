@@ -6,6 +6,7 @@ using UnityEngine;
 public class PlayerData : MonoBehaviour
 {
     [SerializeField] private PlayerInteractions playerInteractions;
+    [SerializeField] private int playerStartingMoney;
 
     public static PlayerData instance;
     public event Action<int> OnPlayerMoneyChanged;
@@ -25,7 +26,7 @@ public class PlayerData : MonoBehaviour
 
     private void Start()
     {
-        playerMoney = 1000;
+        playerMoney = playerStartingMoney;
     }
 
     public void AddMoney(int moneyAmount)
@@ -44,7 +45,8 @@ public class PlayerData : MonoBehaviour
     public PlayerSaveData GetPlayerSaveData()
     {
         int vehicleIndex = playerInteractions.GetVehicleIndex();
-        PlayerSaveData playerSaveData = new PlayerSaveData(playerInteractions.GetPlayerPosition(), playerMoney, vehicleIndex);
+        PlayerSaveData playerSaveData = new PlayerSaveData(playerInteractions.GetPlayerPosition(), playerMoney, vehicleIndex,
+            TimeManager.instance.Hour, TimeManager.instance.Minute);
         return playerSaveData;
     }
 
@@ -54,5 +56,7 @@ public class PlayerData : MonoBehaviour
         playerInteractions.SetPlayerPosition(saveData.position);
         if (saveData.vehicleIndex != -1)
             playerInteractions.GetInVehicle(VehicleManager.instance.vehiclesSpawned[saveData.vehicleIndex]);
+
+        TimeManager.instance.SetTime(saveData.hour, saveData.minute);
     }
 }

@@ -12,7 +12,7 @@ public class BuildingManager : MonoBehaviour
     [SerializeField] private float buildingRange;
 
     private bool isBuilding;
-    private bool isBuildingWall;
+    //private bool isBuildingWall;
     private bool isRemovingBuildings = false;
 
 
@@ -134,7 +134,6 @@ public class BuildingManager : MonoBehaviour
         if(buildingPreview != null)
             Destroy(buildingPreview);
         isBuilding = false;
-        isBuildingWall = false;
         buildingIndex = 0;
         UIManager.textUI.UpdateText(string.Empty);
     }
@@ -154,6 +153,7 @@ public class BuildingManager : MonoBehaviour
         if (Physics.Raycast(origin, direction, out hit, buildingRange)) {
             if (hit.transform.parent && hit.transform.parent.TryGetComponent(out IBuildable building)){
                 building.Destroy();
+                surface.BuildNavMesh();
             }
         }
     }

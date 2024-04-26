@@ -43,8 +43,10 @@ public class AutomaticDoor : MonoBehaviour
 
     private void OnDoorTriggerEnter(Collider other)
     {
-        Debug.Log(other.name);
+        //Debug.Log(other.name + " " + LayerMask.LayerToName(other.gameObject.layer));
         if(other.gameObject.layer == LayerMask.NameToLayer("Player") || (other.gameObject.layer == LayerMask.NameToLayer("Customer"))) {
+            if (peopleInRange.Contains(other.gameObject))
+                return;
             peopleInRange.Add(other.gameObject);
             if (peopleInRange.Count == 1)
                 OpenDoor();

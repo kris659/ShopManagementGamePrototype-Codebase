@@ -14,13 +14,13 @@ public class HoldingUI : MonoBehaviour
         UIGameObject.SetActive(false);
     }
     
-    public void UpdateText(int productAmount, ProductSO productType)
+    public void UpdateText(int productAmount, int holdingLimit)
     {
-        if(productAmount == 0 || productType.holdingLimit <= 1) {
+        if(productAmount == 0 || holdingLimit <= 1) {
             UIGameObject.SetActive(false);
             return;
         }
-        text.text = productAmount + " / " + productType.holdingLimit;
+        text.text = productAmount + " / " + holdingLimit;
         UIGameObject.SetActive(true);
     }
 }

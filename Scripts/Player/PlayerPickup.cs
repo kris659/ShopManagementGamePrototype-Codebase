@@ -26,7 +26,7 @@ public class PlayerPickup : MonoBehaviour
 
     Quaternion placingRotation { get; set; }
 
-    private List<Product> productScriptList = new List<Product>();
+    private List<IPickable> productScriptList = new List<IPickable>();
     private int productsAmount { get { return productScriptList.Count; } }
 
     private void Update()
@@ -38,7 +38,7 @@ public class PlayerPickup : MonoBehaviour
                 DropObject();
             }
             else
-                if (Input.GetMouseButtonDown(0))
+                if (Input.GetMouseButtonDown(0) && !Input.GetMouseButton(1))
                     TryToPickup();
         }
         else
@@ -53,6 +53,7 @@ public class PlayerPickup : MonoBehaviour
                 previewGO.SetActive(IsPlacingObject);
             }
         }
+        HandleInteractionsUI();
         //float mouseScrollY = -data.mouseScrollY;
         //if (data.buttonZ) mouseScrollY = -1;
         //if (data.buttonX) mouseScrollY = 1;
@@ -61,33 +62,38 @@ public class PlayerPickup : MonoBehaviour
 
     private void TryToPickup()
     {        
-        if (productScriptList.Count > 0 && productsAmount >= productScriptList[productScriptList.Count - 1].productType.holdingLimit) return;       
+        if (productScriptList.Count > 0 && productsAmount >= productScriptList[productScriptList.Count - 1].HoldingLimit) return;
 
+        IPickable product = RaycastPickable();
+        if(product != null) {
+            Pickup(product);
+        }
+    }
+    private IPickable RaycastPickable()
+    {
         Vector3 origin = playerCamera.transform.position;
         Vector3 direction = playerCamera.transform.TransformDirection(Vector3.forward);
 
         RaycastHit hit;
-        if (Physics.Raycast(origin, direction, out hit, pickupRange, _pickableLayerMask))
-        {
-            if (hit.transform.TryGetComponent(out ProductGO productScript)) {
-                Pickup(hit.transform, productScript.product);
-                return;
+        if (Physics.Raycast(origin, direction, out hit, pickupRange, _pickableLayerMask)) {
+            if (hit.transform.TryGetComponent(out IPickableGO pickableScript)) {
+                return pickableScript.pickable;
             }
-            
-            if (hit.transform.parent != null && hit.transform.parent.TryGetComponent(out productScript)) {
-                Pickup(hit.transform.parent, productScript.product);
-                return;
+
+            if (hit.transform.parent != null && hit.transform.parent.TryGetComponent(out pickableScript)) {
+                return pickableScript.pickable;
             }
         }
+        return null;
     }
 
-    private void Pickup(Transform product, Product pickableScript)
+    private void Pickup(IPickable pickableScript)
     {
-        if (productScriptList.Count > 0 && productScriptList[0].productType != pickableScript.productType)
+        if (productScriptList.Count > 0 && productScriptList[0].HoldingLimitID != pickableScript.HoldingLimitID)
             return;
         productScriptList.Add(pickableScript);
-        UIManager.holdingUI.UpdateText(productsAmount, productScriptList[productsAmount - 1].productType);
-        pickableScript.OnPlayerTake(productsAmount == 1, productParent);            
+        UIManager.holdingUI.UpdateText(productsAmount, productScriptList[productsAmount - 1].HoldingLimit);
+        pickableScript.OnPlayerTake(productsAmount == 1, productParent);
         if (productsAmount == 1)
             SetPreviewActive();
     }
@@ -98,7 +104,7 @@ public class PlayerPickup : MonoBehaviour
         GetSpawnPosition(out Vector3 position, out Quaternion rotation);
         if (CanPlace(position, rotation))
         {
-            UIManager.holdingUI.UpdateText(productsAmount - 1, productScriptList[productsAmount - 1].productType);
+            UIManager.holdingUI.UpdateText(productsAmount - 1, productScriptList[productsAmount - 1].HoldingLimit);
             productScriptList[productsAmount - 1].Place(position, rotation, null);
             productScriptList.RemoveAt(productsAmount - 1);
             
@@ -115,7 +121,7 @@ public class PlayerPickup : MonoBehaviour
         {
             placingRotation = Quaternion.identity;
 
-            previewGO = Instantiate(productScriptList[productsAmount - 1].productType.visualPrefab);
+            previewGO = productScriptList[0].PreviewGameObject;
             previewGO.transform.GetChild(0).GetComponent<Renderer>().material = placingPreviewMaterial;
             previewGO.name = "Placing Preview";
             previewGO.SetActive(false);
@@ -165,7 +171,7 @@ public class PlayerPickup : MonoBehaviour
 
         if (emptyGO == null) emptyGO = new GameObject("Placing Empty(Calculations)");
         GameObject previewGO = emptyGO;
-        BoxCollider collider = productScriptList[productsAmount - 1].productType.prefab.GetComponentInChildren<BoxCollider>();
+        BoxCollider collider = productScriptList[productsAmount - 1].BoxCollider;
         //Debug.Log(collider.name);
         Vector3 colliderSize = collider.size;
         //Debug.Log(colliderSize);
@@ -262,12 +268,40 @@ public class PlayerPickup : MonoBehaviour
 
     bool CanPlace(Vector3 spawnPosition, Quaternion rotation)
     {
-        BoxCollider collider = productScriptList[productsAmount - 1].productType.prefab.GetComponentInChildren<BoxCollider>();
+        BoxCollider collider = productScriptList[productsAmount - 1].BoxCollider;
         //Quaternion rotation = Quaternion.Euler(transform.GetChild(0).eulerAngles + collider.transform.localEulerAngles + placingRotation.eulerAngles);
         Vector3 center = spawnPosition + collider.center + collider.transform.localPosition;
         Vector3 halfExtents = collider.size / 2.2f;
         Collider[] hitColliders = Physics.OverlapBox(center, halfExtents, rotation, _placingLayerMask);
         //if(hitColliders.Length > 0) { Debug.Log(hitColliders[0].transform.parent.name); }
         return (hitColliders.Length == 0);
+    }
+
+    int interactionsCounter = 0;
+    void HandleInteractionsUI()
+    {
+        interactionsCounter++;
+        if (interactionsCounter != 6) return;
+        interactionsCounter = 0;
+
+        
+        IPickable product = RaycastPickable();
+        if (product != null) {
+            if (productScriptList.Count > 0 && (productScriptList[0].HoldingLimitID != product.HoldingLimitID || productsAmount >= productScriptList[productScriptList.Count - 1].HoldingLimit)) {
+                UIManager.possibleActionsUI.RemoveAction("LMB - pickup object");
+            }
+            else {
+                UIManager.possibleActionsUI.AddAction("LMB - pickup object");
+            }
+        }
+        else {
+            UIManager.possibleActionsUI.RemoveAction("LMB - pickup object");
+        }
+        if (productScriptList.Count > 0) {
+            UIManager.possibleActionsUI.AddAction("Hold RMB and click LMB - place object");
+        }
+        else {
+            UIManager.possibleActionsUI.RemoveAction("Hold RMB and click LMB - place object");
+        }
     }
 }
