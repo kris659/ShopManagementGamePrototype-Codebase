@@ -4,10 +4,9 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 
-public class BuildingUI : MonoBehaviour
+public class BuildingUI : WindowUI
 {
     private BuildingManager buildingManager;
-    private GameObject UIGameObject;
 
     [SerializeField] private Transform categoryListParent;
     [SerializeField] private GameObject categoryListElementPrefab;
@@ -24,18 +23,14 @@ public class BuildingUI : MonoBehaviour
 
     private int currentlySelectedCategory = 0;
 
-    public bool isOpen { get { return UIGameObject.activeSelf; } }
     public void Init(BuildingManager buildingManager)
     {
         this.buildingManager = buildingManager;
-        UIGameObject = transform.GetChild(0).gameObject;
         destroyButton.onClick.AddListener(() =>
         {
             CloseUI();
             buildingManager.OnDestroyButtonClicked();
         });
-
-        CloseUI();
     }
     private void CreateCategoryList()
     {
@@ -87,21 +82,11 @@ public class BuildingUI : MonoBehaviour
         CloseUI();
     }
 
-    public void OpenUI()
+    public override void OpenUI()
     {
-        PlayerInteractions.Instance.LockCameraForUI();
+        base.OpenUI();
         CreateCategoryList();
         OnCategoryButtonClicked(currentlySelectedCategory);
-
-        Cursor.lockState = CursorLockMode.None;
-        UIGameObject.SetActive(true);
-    }
-
-    public void CloseUI()
-    {
-        PlayerInteractions.Instance.UnlockCameraForUI();
-        Cursor.lockState = CursorLockMode.Locked;
-        UIGameObject.SetActive(false);
     }
 
     private void DestroyAllElements(List<GameObject> elements)

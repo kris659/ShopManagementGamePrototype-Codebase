@@ -8,8 +8,10 @@ public class TimeManager : MonoBehaviour
     public static TimeManager instance;
     public Action OnMinuteChanged;
     public Action OnHourChanged;
+    public Action OnDayChanged;
     public int Minute { get; private set; }
     public int Hour { get; private set; }    
+    public int Day { get; private set; }
 
     private float minuteInRealTime = 1f;
     private float timer;
@@ -35,24 +37,35 @@ public class TimeManager : MonoBehaviour
         timer -= Time.deltaTime;
         if(timer <=0)
         {
-            Minute++;
-            OnMinuteChanged?.Invoke();
-            if(Minute >= 60)
-            {
+            Minute++;            
+            if(Minute >= 60){
                 Hour++;
-                Minute = 0;
-                OnHourChanged?.Invoke();
-                if(Hour >= 24)
-                {
+                Minute = 0;                
+                if(Hour >= 24){
                     Hour = 0;
+                    Day++;
+                    OnDayChanged?.Invoke();                    
                 }
+                OnHourChanged?.Invoke();
             }
+            OnMinuteChanged?.Invoke();
             timer = minuteInRealTime;
         }
     }
-    public void SetTime(int hour, int minute)
+
+    public TimeSaveData GetSaveData()
     {
-        Minute = minute;
-        Hour = hour;
+        return new TimeSaveData(Day, Hour, Minute);
     }
+
+    public void LoadFromSaveData(TimeSaveData saveData)
+    {
+        Minute = saveData.minute;
+        Hour = saveData.hour;
+        Day = saveData.day;
+        OnMinuteChanged?.Invoke();
+        //OnHourChanged?.Invoke();
+        //OnDayChanged?.Invoke();
+    }
+
 }

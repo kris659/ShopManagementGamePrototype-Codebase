@@ -4,9 +4,8 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 
-public class SavingUI : MonoBehaviour
+public class SavingUI : WindowUI
 {
-    private GameObject UIGameObject;
     private SavingManager savingManager;
 
     [SerializeField] private TMP_InputField savingInputField;
@@ -14,12 +13,11 @@ public class SavingUI : MonoBehaviour
     [SerializeField] private Button saveButton;
     [SerializeField] private Button loadButton;
 
+    public override bool canClose => !savingInputField.isFocused;
+
     private List<string> options;
-    public bool isOpen = false;
     public void Init(SavingManager savingManager)
     {
-        UIGameObject = transform.GetChild(0).gameObject;
-        CloseUI();
         this.savingManager = savingManager;
         
         saveButton.onClick.AddListener(OnSaveButtonClicked);
@@ -27,26 +25,19 @@ public class SavingUI : MonoBehaviour
         loadingDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
     }
 
-    public void OpenUI()
+    public override void OpenUI()
     {
-        PlayerInteractions.Instance.LockCameraForUI();
-        isOpen = true;
-        UIGameObject.SetActive(true);
+        base.OpenUI();
         loadingDropdown.ClearOptions();
-
         options = new List<string> { "Select save to load" };
-        options.AddRange(SaveFilesManager.GetSaveFileNames());     
-        
+        options.AddRange(SaveFilesManager.GetSaveFileNames());        
         loadingDropdown.AddOptions(options);
-        Cursor.lockState = CursorLockMode.None;
     }
 
-    public void CloseUI()
+    public override void CloseUI()
     {
-        PlayerInteractions.Instance.UnlockCameraForUI();
-        isOpen = false; 
-        UIGameObject.SetActive(false);
-        Cursor.lockState = CursorLockMode.Locked;
+        base.CloseUI();
+        Time.timeScale = 1.0f;
     }
 
     private void OnSaveButtonClicked()
@@ -66,5 +57,4 @@ public class SavingUI : MonoBehaviour
     {
         loadButton.interactable = (index != 0);
     }
-
 }

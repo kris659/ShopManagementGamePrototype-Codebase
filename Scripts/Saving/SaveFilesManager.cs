@@ -92,7 +92,7 @@ public static class SaveFilesManager
         if(!Directory.Exists(saveDirectoryPath)) return new List<string>();
 
         DirectoryInfo directoryInfo = new DirectoryInfo(saveDirectoryPath);
-        FileInfo[] files = directoryInfo.GetFiles().OrderBy(p => p.CreationTime).ToArray();
+        FileInfo[] files = directoryInfo.GetFiles().OrderBy(p => p.CreationTime).Reverse().ToArray();
         List<string> fileNames = new List<string>();
         for (int i = 0; i < files.Length; i++) fileNames.Add(files[i].Name);
         return fileNames;

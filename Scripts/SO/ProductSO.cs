@@ -14,10 +14,10 @@ public class ProductSO : ScriptableObject, IListable
     public Vector3 offset;
     public Sprite icon;
 
-    public int sellingPrice;
-
     public int Price { get { return _price; } }
-    [SerializeField] private int _price; public int holdingLimit = 1;
+    [SerializeField] private int _price;
+    
+    public int holdingLimit = 1;
 
     public bool canBePlacedOnShelf = true;
     public bool isContainer = false;

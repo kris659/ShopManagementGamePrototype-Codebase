@@ -10,7 +10,6 @@ public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
     [SerializeField] float openingTime = 0.5f;
 
     [SerializeField] private GameObject[] containerDoors;
-    private Vector3[] containerClosedDoorsPositions;
     [SerializeField] private Vector3[] containerOpenDoorsRotations;
 
     [SerializeField] private GameObject containerOpenCollider;
@@ -37,13 +36,13 @@ public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
     {
         GameObject containerGO;
         if (isOnlyVisual) {
-            containerGO = Instantiate(container.productType.visualPrefab, position, rotation, parent);
+            containerGO = Instantiate(container.containerType.visualPrefab, position, rotation, parent);
             if (isColliderActive) {
                 containerGO.GetComponent<Collider>().enabled = true;
             }            
         }
         else 
-            containerGO = Instantiate(container.productType.prefab, position, rotation, parent);
+            containerGO = Instantiate(container.containerType.prefab, position, rotation, parent);
         ContainerGO containerGOScript = containerGO.GetComponent<ContainerGO>();
         containerGOScript.container = container;
         containerGOScript.Init(false);

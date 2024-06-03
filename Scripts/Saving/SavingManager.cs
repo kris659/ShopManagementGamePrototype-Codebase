@@ -9,25 +9,27 @@ public class SavingManager : MonoBehaviour
     [SerializeField] private bool shouldLoadOnStart = false;
     public string startingSaveName;
     [SerializeField] private int startingMoney;
+    [SerializeField] private List<bool> startingUnlockedCars;
+    [SerializeField] private List<bool> startingUnlockedLand;
     [SerializeField] private NavMeshSurface navMeshSurface;
     SavingUI savingUI;
-    
-    private IEnumerator Start()
-    {
-        savingUI = UIManager.savingUI;
-        savingUI.Init(this);
 
+    private void Awake()
+    {
+        SceneLoader.OnUISceneLoaded += () => {
+            savingUI = UIManager.savingUI;
+            savingUI.Init(this);
+        };
+        SceneLoader.OnWorldSceneLoaded += () => {
+            StartCoroutine(OnWorldSceneLoaded());
+        };
+    }
+
+    IEnumerator OnWorldSceneLoaded()
+    {
         yield return new WaitForEndOfFrame();
         if (shouldLoadOnStart)
             Load(startingSaveName, true);
-    }
-    void Update()
-    {
-        if(Input.GetKeyDown(KeyCode.P))
-            if(savingUI.isOpen)
-                savingUI.CloseUI();
-            else
-                savingUI.OpenUI();
     }
 
     public void Save(string saveName, bool isStartingSave = false)
@@ -48,16 +50,29 @@ public class SavingManager : MonoBehaviour
 
         try { ShopData.instance.LoadFromSaveData(saveData); }
         catch (Exception e) { Debug.LogError("Failed loading ShopData " + e.Message); }
+        try { WorkersManager.instance.LoadFromSaveData(saveData.workersData); }
+        catch (Exception e) { Debug.LogError("Failed loading ShopData " + e.Message); }
         //ProductsData.instance.LoadFromSaveData(saveData.productsData, saveData.containersData);
         try { ProductsData.instance.LoadFromSaveData(saveData.productsData, saveData.containersData); }
         catch (Exception e) { Debug.LogError("Failed loading ProductsData " + e.Message); }
 
         try { VehicleManager.instance.LoadFromSaveData(saveData.vehiclesData);}
         catch (Exception e) { Debug.LogError("Failed loading VehiclesData " + e.Message); }
+        PlayerData.instance.LoadFromSaveData(saveData.playerData);
+        //try { PlayerData.instance.LoadFromSaveData(saveData.playerData); }
+        //catch (Exception e) { Debug.LogError("Failed loading PlayerData " + e.Message); }
 
-        try { PlayerData.instance.LoadFromSaveData(saveData.playerData); }
-        catch (Exception e) { Debug.LogError("Failed loading PlayerData " + e.Message); }
-        
+        try { TimeManager.instance.LoadFromSaveData(saveData.timeData); }
+        catch (Exception e) { Debug.LogError("Failed loading TimeData " + e.Message); }
+
+        VehicleManager.instance.vehiclesUnlocked = startingUnlockedCars;
+        navMeshSurface.BuildNavMesh();
+        StartCoroutine(BuildNavMesh());
+    }
+
+    IEnumerator BuildNavMesh()
+    {
+        yield return new WaitForSeconds(0.2f);
         navMeshSurface.BuildNavMesh();
     }
 
@@ -65,6 +80,9 @@ public class SavingManager : MonoBehaviour
     private SaveData CreateSaveData(bool isStartingSave)
     {
         PlayerSaveData playerSaveData;
+        ShopSaveData shopSaveData;
+        WorkerSaveData[] workersSaveData;
+        TimeSaveData timeSaveData;
         ShelfSaveData[] shelfSaveData;
         RegisterSaveData[] registerSaveData;
         WallSaveData[] wallSaveData;
@@ -76,13 +94,46 @@ public class SavingManager : MonoBehaviour
             playerSaveData = PlayerData.instance.GetPlayerSaveData();
             if (isStartingSave) {
                 playerSaveData.playerMoney = startingMoney;
-                playerSaveData.hour = 12;
-                playerSaveData.minute = 0;
+                playerSaveData.pickedupProducts = new int[0];
+                playerSaveData.pickedupContainers = new int[0];
             }
         }
         catch (Exception e){
             Debug.LogError("Failed creating PlayerSaveData: " + e.Message);
-            playerSaveData = new PlayerSaveData(Vector3.zero, 1000, 0, 12, 0);
+            playerSaveData = new PlayerSaveData(Vector3.zero, 1000, 0, new int[0], new int[0]);
+        }
+        try {
+            shopSaveData = ShopData.instance.GetSaveData();
+            if (isStartingSave) {
+                shopSaveData.unlockedCars = startingUnlockedCars.ToArray();
+                shopSaveData.unlockedLand = startingUnlockedLand.ToArray();
+            }
+        }
+        catch (Exception e) {
+            Debug.LogError("Failed creating ShopSaveData: " + e.Message);
+            shopSaveData = new ShopSaveData(startingUnlockedCars.ToArray(), startingUnlockedLand.ToArray());
+        }
+        try {
+            workersSaveData = WorkersManager.instance.GetSaveData();
+            if (isStartingSave) {
+                workersSaveData = new WorkerSaveData[0];
+            }
+        }
+        catch (Exception e) {
+            Debug.LogError("Failed creating WorkersSaveData: " + e.Message);
+            workersSaveData = new WorkerSaveData[0];
+        }
+        try {
+            timeSaveData = TimeManager.instance.GetSaveData();
+            if (isStartingSave) {
+                timeSaveData.day = 1;
+                timeSaveData.hour = 12;
+                timeSaveData.minute = 0;
+            }
+        }
+        catch (Exception e) {
+            Debug.LogError("Failed creating PlayerSaveData: " + e.Message);
+            timeSaveData = new TimeSaveData(1, 12, 0);
         }
         try {
             shelfSaveData = ShopData.instance.GetShelfSaveData();
@@ -127,7 +178,7 @@ public class SavingManager : MonoBehaviour
             vehiclesSaveData = new VehicleSaveData[0];
         }
 
-        SaveData saveData = new SaveData(playerSaveData, shelfSaveData, wallSaveData, registerSaveData, productSaveData, containerSaveData, vehiclesSaveData);
+        SaveData saveData = new SaveData(playerSaveData, shopSaveData, workersSaveData, timeSaveData, shelfSaveData, wallSaveData, registerSaveData, productSaveData, containerSaveData, vehiclesSaveData);
         return saveData;
     }
 
@@ -137,5 +188,7 @@ public class SavingManager : MonoBehaviour
         ShopData.instance.DestroyAll();
         ProductsData.instance.DestroyAll();        
         VehicleManager.instance.DestroyAll();
+        WorkersManager.instance.DestroyAll();
+        PlayerData.instance.ClearScene();
     }
 }

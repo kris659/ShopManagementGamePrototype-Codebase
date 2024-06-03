@@ -1,4 +1,5 @@
 using Cinemachine;
+using System.Collections;
 using UnityEngine;
 
 public class PlayerInteractions : MonoBehaviour
@@ -23,11 +24,17 @@ public class PlayerInteractions : MonoBehaviour
 
     private CinemachineVirtualCamera playerVirtualCamera;
     private CinemachineVirtualCamera vehicleVirtualCamera;
+    private CinemachineFreeLook vehicleThirdPersonCamera;
     private CinemachinePOV playerVirtualCameraPOV;
     private CinemachinePOV vehicleVirtualCameraPOV;
 
+    private float mouseSensitivity;
+
     private float cameraHorizontalSpeed;
     private float cameraVerticalSpeed;
+
+    private float vehicleThirdPersonHorizontalSpeed;
+    private float vehicleThirdPersonVerticalSpeed;
 
     private bool isCameraLockedForUI = false;
 
@@ -45,6 +52,9 @@ public class PlayerInteractions : MonoBehaviour
 
     void Start()
     {
+        SettingsUI.OnMouseSensitivityChanged += OnMouseSensitivityChanged;
+        mouseSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", 0.5f) + 0.5f;
+
         firstPersonController = GetComponent<FirstPersonController>();
         vehicleController = GetComponent<PlayerVehicleController>();
 
@@ -55,11 +65,21 @@ public class PlayerInteractions : MonoBehaviour
 
         cameraVerticalSpeed = playerVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed;
         cameraHorizontalSpeed = playerVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed;
+
+        playerVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed * mouseSensitivity;
+        playerVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed * mouseSensitivity;
+
+        vehicleVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed * mouseSensitivity;
+        vehicleVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed * mouseSensitivity;
     }
 
     void Update()
     {
+        if (UIManager.BlockInput)
+            return;
         if(Input.GetKeyDown(KeyCode.E))
+            HandleInteractions();
+        if (Input.GetKeyDown(KeyCode.F))
             HandleInteractions();
         if (Input.GetKeyDown(KeyCode.LeftControl)){
             Cursor.lockState = CursorLockMode.None;
@@ -77,20 +97,46 @@ public class PlayerInteractions : MonoBehaviour
 
     private void HandleInteractions()
     {
-        if (isDriving) {
-            GetOutOfVehicle();
-        }
-        else {
+        //if (isDriving) {
+        //    GetOutOfVehicle();
+        //}
+        //else {
+        //    IInteractable interactable = Raycast<IInteractable>(playerInteractionRange, interactionsLayerMask, true);
+        //    if(interactable != null) {
+        //        interactable.OnPlayerInteract();
+        //        HandlePossibleInteractions();
+        //        return;
+        //    }
+        //    IVehicle vehicle = Raycast<IVehicle>(playerCarInteractionRange, carLayerMask, false);
+        //    if (vehicle != null) {
+        //        if (VehicleManager.instance.IsVehicleUnlocked(vehicle))
+        //            GetInVehicle(vehicle);
+        //        else {
+        //            VehicleManager.instance.TryToUnlockVehicle(vehicle);
+        //        }
+        //    }
+        //}
+        if (Input.GetKeyDown(KeyCode.E)) {
             IInteractable interactable = Raycast<IInteractable>(playerInteractionRange, interactionsLayerMask, true);
-            if(interactable != null) {
+            if (interactable != null) {
                 interactable.OnPlayerInteract();
                 HandlePossibleInteractions();
                 return;
             }
+        }
+        if(Input.GetKeyDown(KeyCode.F)) {
+            if (isDriving) {
+                GetOutOfVehicle();
+                return;
+            }
             IVehicle vehicle = Raycast<IVehicle>(playerCarInteractionRange, carLayerMask, false);
             if (vehicle != null) {
-                GetInVehicle(vehicle);
-            }
+                if (VehicleManager.instance.IsVehicleUnlocked(vehicle))
+                    GetInVehicle(vehicle);
+                else {
+                    VehicleManager.instance.TryToUnlockVehicle(vehicle);
+                }
+            }            
         }
     }
 
@@ -114,8 +160,8 @@ public class PlayerInteractions : MonoBehaviour
 
     public void GetInVehicle(IVehicle vehicle)
     {
-        UIManager.possibleActionsUI.RemoveAction("E - enter the vehicle");
-        UIManager.possibleActionsUI.AddAction("E - leave the vehicle");
+        UIManager.possibleActionsUI.RemoveAction("F - enter the vehicle");
+        UIManager.possibleActionsUI.AddAction("F - leave the vehicle");
         UIManager.possibleActionsUI.AddAction("V - change camera");
 
         isDriving = true;
@@ -130,11 +176,30 @@ public class PlayerInteractions : MonoBehaviour
         playerCamera.SetActive(false);
         firstPersonController.enabled = false;
         playerRigidbody.SetActive(false);
+        mainCamera.transform.GetChild(0).gameObject.SetActive(false);
+
+        vehicleThirdPersonCamera = vehicle.ThirdPersonCamera.GetComponentInChildren<CinemachineFreeLook>();
+
+        vehicleThirdPersonHorizontalSpeed = vehicleThirdPersonCamera.m_XAxis.m_MaxSpeed;
+        vehicleThirdPersonVerticalSpeed = vehicleThirdPersonCamera.m_YAxis.m_MaxSpeed;
+        vehicleThirdPersonCamera.m_XAxis.m_MaxSpeed = vehicleThirdPersonHorizontalSpeed * mouseSensitivity;
+        vehicleThirdPersonCamera.m_YAxis.m_MaxSpeed = vehicleThirdPersonVerticalSpeed * mouseSensitivity;
+
+        StartCoroutine(FixGetInVehicle());
+    }
+
+    IEnumerator FixGetInVehicle()
+    {
+        yield return new WaitForSeconds(0.1f);
+        if (isDriving) {
+            vehicleController.enabled = true;
+            firstPersonController.enabled = false;
+        }
     }
 
     private void GetOutOfVehicle()
     {
-        UIManager.possibleActionsUI.RemoveAction("E - leave the vehicle");
+        UIManager.possibleActionsUI.RemoveAction("F - leave the vehicle");
         UIManager.possibleActionsUI.RemoveAction("V - change camera");
         isDriving = false;
         vehicleController.enabled = false;
@@ -148,18 +213,21 @@ public class PlayerInteractions : MonoBehaviour
         playerVirtualCameraPOV.m_HorizontalAxis = vehicleVirtualCameraPOV.m_HorizontalAxis;
         playerVirtualCameraPOV.m_VerticalAxis = vehicleVirtualCameraPOV.m_VerticalAxis;
 
+        vehicleThirdPersonCamera.m_XAxis.m_MaxSpeed = vehicleThirdPersonHorizontalSpeed;
+        vehicleThirdPersonCamera.m_YAxis.m_MaxSpeed = vehicleThirdPersonVerticalSpeed;
+
         playerCamera.SetActive(true);
         vehicleFPSCamera.SetActive(false);
+        mainCamera.transform.GetChild(0).gameObject.SetActive(true);
 
-        if(vehicle != null && vehicle.ThirdPersonCamera != null)
+        if (vehicle != null && vehicle.ThirdPersonCamera != null)
             vehicle.ThirdPersonCamera.SetActive(false);
+        vehicle = null;
     }
 
     public int GetVehicleIndex()
     {
-        if (!isDriving)
-            return -1;
-        return VehicleManager.instance.vehiclesSpawned.IndexOf(vehicle);
+        return VehicleManager.instance.GetVehicleIndex(vehicle);
     }
 
     public void SetPlayerPosition(Vector3 position)
@@ -174,7 +242,7 @@ public class PlayerInteractions : MonoBehaviour
 
     private void Handle3rdPearsonCamera()
     {
-        GameObject camera = vehicle.ThirdPersonCamera;
+        GameObject camera = vehicle.ThirdPersonCamera;        
         camera.SetActive(!camera.activeSelf);
         vehicleFPSCamera.SetActive(!camera.activeSelf);
     }
@@ -198,21 +266,23 @@ public class PlayerInteractions : MonoBehaviour
         vehicleVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = 0;
         vehicleVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = 0;
 
-        if(vehicle != null && vehicle.ThirdPersonCamera != null) {
-
+        if(vehicle != null && vehicle.ThirdPersonCamera.activeSelf) {            
+            vehicleThirdPersonCamera.m_XAxis.m_MaxSpeed = 0;
+            vehicleThirdPersonCamera.m_YAxis.m_MaxSpeed = 0;
         }
     }
     private void UnlockCamera()
     {
         if (playerVirtualCamera == null)
             return;
-        playerVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed;
-        playerVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed;
-        vehicleVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed;
-        vehicleVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed;
+        playerVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed * mouseSensitivity;
+        playerVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed * mouseSensitivity;
+        vehicleVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed * mouseSensitivity;
+        vehicleVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed * mouseSensitivity;
 
-        if (vehicle != null && vehicle.ThirdPersonCamera != null) {
-
+        if (vehicle != null && vehicle.ThirdPersonCamera.activeSelf) {
+            vehicleThirdPersonCamera.m_XAxis.m_MaxSpeed = vehicleThirdPersonHorizontalSpeed * mouseSensitivity;
+            vehicleThirdPersonCamera.m_YAxis.m_MaxSpeed = vehicleThirdPersonVerticalSpeed * mouseSensitivity;
         }
     }
 
@@ -227,17 +297,36 @@ public class PlayerInteractions : MonoBehaviour
         possibleInteractionsCounter = 0;
         IInteractable interactable = Raycast<IInteractable>(playerInteractionRange, interactionsLayerMask, true);
         UIManager.possibleActionsUI.RemoveAction(previousActionText);
-        UIManager.possibleActionsUI.RemoveAction("E - enter the vehicle");
+        UIManager.possibleActionsUI.RemoveAction("F - enter the vehicle"); 
+        UIManager.possibleActionsUI.RemoveAction("F - unlock the vehicle");
         if (interactable != null) {
-
             previousActionText = interactable.textToDisplay;
             UIManager.possibleActionsUI.AddAction(previousActionText);
         }
         else {
             IVehicle vehicle = Raycast<IVehicle>(playerCarInteractionRange, carLayerMask, false);
             if (vehicle != null) {
-                UIManager.possibleActionsUI.AddAction("E - enter the vehicle");
+                if(VehicleManager.instance.IsVehicleUnlocked(vehicle))
+                    UIManager.possibleActionsUI.AddAction("F - enter the vehicle");
+                else {
+                    UIManager.possibleActionsUI.AddAction("F - unlock the vehicle");
+                }
             }
+        }
+    }
+
+    private void OnMouseSensitivityChanged(float value)
+    {
+        mouseSensitivity = value + 0.5f;
+
+        playerVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed * mouseSensitivity;
+        playerVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed * mouseSensitivity;
+        vehicleVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed * mouseSensitivity;
+        vehicleVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed * mouseSensitivity;
+
+        if (vehicle != null && vehicle.ThirdPersonCamera.activeSelf) {
+            vehicleThirdPersonCamera.m_XAxis.m_MaxSpeed = vehicleThirdPersonHorizontalSpeed * mouseSensitivity;
+            vehicleThirdPersonCamera.m_YAxis.m_MaxSpeed = vehicleThirdPersonVerticalSpeed * mouseSensitivity;
         }
     }
 }

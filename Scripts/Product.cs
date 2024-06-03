@@ -11,26 +11,29 @@ public class Product: IPickable
 
     public bool isTakenByCustomer;
     public bool isInClosedContainer;
-    public Shelf shelf;
+    public List<IPlacingTriggerArea> placingTriggerAreas = new List<IPlacingTriggerArea>();
 
     public int HoldingLimit => productType.holdingLimit;
-    public int HoldingLimitID => productTypeIndex;
+    public int PickableTypeID => productTypeIndex;
+    public int PickableID => ProductsData.instance.productsSpawned.IndexOf(this);
+
     public BoxCollider BoxCollider => productType.prefab.GetComponentInChildren<BoxCollider>();
 
     public GameObject PreviewGameObject => GameObject.Instantiate(productType.visualPrefab);
+    public GameObject GameObject => productGO.gameObject;
 
     public Product(int typeIndex)
     {
         this.productTypeIndex = typeIndex;
         this.productType = SOData.productsList[typeIndex];
-        ProductsData.instance.products.Add(this);
+        ProductsData.instance.productsSpawned.Add(this);
     }
 
     public Product(int typeIndex, bool isPhysxSpawned, Vector3 position, Quaternion rotation)
     {
         this.productTypeIndex = typeIndex;
         this.productType = SOData.productsList[typeIndex];
-        ProductsData.instance.products.Add(this);
+        ProductsData.instance.productsSpawned.Add(this);
         if (isPhysxSpawned)
             Place(position, rotation, null);
     }
@@ -40,49 +43,48 @@ public class Product: IPickable
         DestroyGameObject();
         productGO = ProductGO.Spawn(false, position, rotation, parent, this);
 
-        if (productType.canBeSold) {
-            shelf = TryToGetShelf(position, rotation);
-            if (shelf != null) {
-                shelf.AddProduct(this);
-            }
-        }
+        UpdatePlacingTriggerAreas(position, rotation);        
+    }
+
+    public void SpawnVisual(Vector3 position, Quaternion rotation, Transform parent)
+    {
+        DestroyGameObject();
+        productGO = ProductGO.Spawn(true, position, rotation, parent, this);
     }
 
     public void OnPlayerTake(bool shoudSpawnVisual, Transform parent)
     {
         DestroyGameObject();
         if (shoudSpawnVisual) {
-            productGO = ProductGO.Spawn(true, Vector3.zero, Quaternion.identity, parent, this);
-            productGO.transform.localPosition = productType.offset;
-            productGO.transform.localRotation = Quaternion.identity;
-            productGO.transform.localScale = Vector3.one;
+            SpawnVisual(parent);
         }     
     }
 
-    private Shelf TryToGetShelf(Vector3 position, Quaternion rotation)
+    private void SpawnVisual(Transform parent)
     {
-        Shelf shelf = null;
+        productGO = ProductGO.Spawn(true, Vector3.zero, Quaternion.identity, parent, this);
+        productGO.transform.localPosition = productType.offset;
+        productGO.transform.localRotation = Quaternion.identity;
+        productGO.transform.localScale = Vector3.one;
+    }
+
+    private void UpdatePlacingTriggerAreas(Vector3 position, Quaternion rotation)
+    {
         BoxCollider collider = productType.prefab.GetComponentInChildren<BoxCollider>();
         Vector3 center = position + collider.center;
         Vector3 halfExtents = collider.size / 2.2f;
         Collider[] hitColliders = Physics.OverlapBox(center, halfExtents, rotation, ShopData.instance.shelfTriggerLayer);
-        Collider closestCollider = GetClosestCollider(hitColliders, position);
-        if (closestCollider != null)
-            shelf = closestCollider.GetComponentInParent<Shelf>();
-        return shelf;
-    }
-
-    private Collider GetClosestCollider(Collider[] hitColliders, Vector3 spawnPosition)
-    {
-        Collider collider = null;
-        float distance = 100;
-        for (int i = 0; i < hitColliders.Length; i++) {
-            if (Vector3.Distance(hitColliders[i].transform.parent.position, spawnPosition) < distance) {
-                collider = hitColliders[i];
-                distance = Vector3.Distance(hitColliders[i].transform.parent.position, spawnPosition);
+        
+        for(int i = 0; i < hitColliders.Length; i++) {
+            IPlacingTriggerArea placingTriggerArea = hitColliders[i].GetComponentInParent<IPlacingTriggerArea>();
+            if (placingTriggerArea != null && !placingTriggerAreas.Contains(placingTriggerArea)){
+                placingTriggerAreas.Add(placingTriggerArea);
+            }
+            placingTriggerArea = hitColliders[i].GetComponent<IPlacingTriggerArea>();
+            if (placingTriggerArea != null && !placingTriggerAreas.Contains(placingTriggerArea)) {
+                placingTriggerAreas.Add(placingTriggerArea);
             }
         }
-        return collider;
     }
 
     public ProductSaveData CreateSaveData()
@@ -100,10 +102,10 @@ public class Product: IPickable
     }
     public void DestroyGameObject()
     {
-        if (shelf != null) {
-            shelf.TakeProduct(this);
-            shelf = null;
+        foreach(IPlacingTriggerArea triggerArea in placingTriggerAreas) {
+            triggerArea.OnProductTakenFromArea(this);
         }
+        placingTriggerAreas.Clear();
         if (productGO != null) {
             GameObject.Destroy(productGO.gameObject);
         }
@@ -113,7 +115,12 @@ public class Product: IPickable
     {
         if (productGO != null)
             GameObject.Destroy(productGO.gameObject);
-        if (shouldRemoveFromProductsList && ProductsData.instance.products.Contains(this))
-            ProductsData.instance.products.Remove(this);
+        if (shouldRemoveFromProductsList && ProductsData.instance.productsSpawned.Contains(this))
+            ProductsData.instance.productsSpawned.Remove(this);
+    }
+
+    public void SpawnVisualSavePickup(Transform parent)
+    {
+        SpawnVisual(parent);
     }
 }

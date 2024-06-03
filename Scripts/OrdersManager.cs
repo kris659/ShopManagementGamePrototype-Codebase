@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
+using static UnityEngine.Rendering.DebugUI;
 
 public class OrdersManager : MonoBehaviour
 {
@@ -22,44 +24,47 @@ public class OrdersManager : MonoBehaviour
             boxSpawnPosition.Add(boxPositionsParent.GetChild(i));
         }
         palletCheckCollider = palletPrefab.transform.GetChild(2).GetComponent<BoxCollider>();
-    }
-    private void Start()
-    {
-        UIManager.ordersUI.Init(this);
-    }
-    private void Update()
-    {
-        if(Input.GetKeyDown(KeyCode.O)) {
-            if (!UIManager.ordersUI.isOpen)
-                UIManager.ordersUI.OpenUI();
-            else
-                UIManager.ordersUI.CloseUI();
-        }
+        SceneLoader.OnUISceneLoaded += () => UIManager.ordersUI.Init(this);
     }
 
-    public void SpawnProducts(int productTypeIndex, int amountTotal)
+    public void SpawnProducts(Dictionary<ProductSO, int> orderDictionary)
     {
-        GameObject pallet = null;
-        int parentIndex = productTypesPositionParentIndex[productTypeIndex];
-        Transform parent = productsInBoxSpawnPositionsParent[parentIndex];
+        GameObject pallet = null; 
+        int boxPositionIndex = 0;
+        float cost = 0;
+        ProductSO[] keys = orderDictionary.Keys.ToArray();
+        foreach (ProductSO productSO in keys) {            
+            int productAmount = orderDictionary[productSO];
+            int productTypeIndex = SOData.GetProductIndex(productSO);
+            int parentIndex = productTypesPositionParentIndex[productTypeIndex];
+            Transform parent = productsInBoxSpawnPositionsParent[parentIndex];
 
-        for (int i = 0; i < boxSpawnPosition.Count && amountTotal > 0; i++) { 
-            if(i%boxSpawnPosition.Count == 0){
-                pallet = SpawnNewPallet();
-                if (pallet == null) {
-                    UIManager.textUI.UpdateText("Not enough space for new pallet", 3f);
-                    return;
+            while(productAmount > 0) {
+                if (boxPositionIndex == 0) {
+                    pallet = SpawnNewPallet();
+                    if (pallet == null) {
+                        UIManager.textUI.UpdateText("Not enough space for new pallet", 3f);
+                        PlayerData.instance.TakeMoney(cost);
+                        return;
+                    }
                 }
-            }
-            
-            Container container = new Container(boxTypeIndex, true, pallet.transform.TransformPoint(boxSpawnPosition[i].localPosition), pallet.transform.rotation, false);
-            
-            int amountToSpawn = Mathf.Min(amountTotal, parent.childCount);
-            amountTotal -= amountToSpawn;
+                Container container = new Container(boxTypeIndex, true, pallet.transform.TransformPoint(boxSpawnPosition[boxPositionIndex].localPosition), pallet.transform.rotation, false);
 
-            container.CreateProductsInContainer(productTypeIndex, amountToSpawn, parent);
+                int amountToSpawn = Mathf.Min(productAmount, parent.childCount);
+                productAmount -= amountToSpawn;
+                if (productAmount == 0)
+                    orderDictionary.Remove(productSO);
+                else
+                    orderDictionary[productSO] = productAmount;
+                cost += amountToSpawn * productSO.Price;
+                container.CreateProductsInContainer(productTypeIndex, amountToSpawn, parent);
+                boxPositionIndex++;
+                if (boxPositionIndex == boxSpawnPosition.Count)
+                    boxPositionIndex = 0;
+            }            
         }
-       
+        PlayerData.instance.TakeMoney(cost);
+        orderDictionary.Clear();
     }
 
     public bool IsEnoughSpace(ProductSO productType, int amount)
@@ -87,7 +92,7 @@ public class OrdersManager : MonoBehaviour
             }
             if (!shouldContinue) {
                 for(int j = 0; j < palletGOList.Count; j++) {
-                    Destroy(palletGOList[i]);
+                    Destroy(palletGOList[j]);
                 }
                 return Instantiate(palletPrefab, palletSpawnPositions[i].position, palletSpawnPositions[i].rotation);
             }

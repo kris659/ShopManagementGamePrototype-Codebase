@@ -1,24 +1,27 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 [System.Serializable]
 public class SaveData
 {
     public PlayerSaveData playerData;
+    public ShopSaveData shopData;
+    public WorkerSaveData[] workersData;
+    public TimeSaveData timeData;
     public ShelfSaveData[] shelvesData;
     public WallSaveData[] wallsData;
     public RegisterSaveData[] registersData;
     public ProductSaveData[] productsData;
     public ContainerSaveData[] containersData;
-    public VehicleSaveData[] vehiclesData;
-    
+    public VehicleSaveData[] vehiclesData;   
 
     public int[] storageManagerProducts;
 
-    public SaveData(PlayerSaveData playerData,  ShelfSaveData[] shelvesData, WallSaveData[] wallsData, RegisterSaveData[] registersData, ProductSaveData[] productsData, ContainerSaveData[] containersData, VehicleSaveData[] vehiclesData)
+    public SaveData(PlayerSaveData playerData, ShopSaveData shopData, WorkerSaveData[] workersData, TimeSaveData timeData, ShelfSaveData[] shelvesData, WallSaveData[] wallsData, RegisterSaveData[] registersData, ProductSaveData[] productsData, ContainerSaveData[] containersData, VehicleSaveData[] vehiclesData)
     {
         this.playerData = playerData;
+        this.shopData = shopData;
+        this.workersData = workersData;
+        this.timeData = timeData;
         this.shelvesData = shelvesData;
         this.wallsData = wallsData;
         this.registersData = registersData;
@@ -27,21 +30,62 @@ public class SaveData
         this.containersData = containersData;
     }    
 }
-
 [System.Serializable]
 public class PlayerSaveData
 {
     public Vector3 position;
-    public int playerMoney;
+    public float playerMoney;
     public int vehicleIndex;
-    public int hour;
-    public int minute;
+    public int[] pickedupProducts;
+    public int[] pickedupContainers;
 
-    public PlayerSaveData(Vector3 position, int playerMoney, int vehicleIndex, int hour, int minute)
+    public PlayerSaveData(Vector3 position, float playerMoney, int vehicleIndex, int[] pickedupProducts, int[] pickedupContainers)
     {
         this.position = position;
         this.playerMoney = playerMoney;
         this.vehicleIndex = vehicleIndex;
+        this.pickedupProducts = pickedupProducts;
+        this.pickedupContainers = pickedupContainers;
+    }
+}
+
+[System.Serializable]
+public class ShopSaveData
+{
+    public bool[] unlockedCars;
+    public bool[] unlockedLand;
+
+    public ShopSaveData(bool[] unlockedCars, bool[] unlockedLand)
+    {
+        this.unlockedCars = unlockedCars;
+        this.unlockedLand = unlockedLand;
+    }
+}
+
+[System.Serializable]
+public class WorkerSaveData
+{
+    public string name;
+    public int task;
+    public int wage;
+    public WorkerSaveData(string name, int task, int wage)
+    {
+        this.name = name;
+        this.task = task;
+        this.wage = wage;
+    }
+}
+
+[System.Serializable]
+public class TimeSaveData
+{
+    public int day;
+    public int hour;
+    public int minute;
+
+    public TimeSaveData(int day, int hour, int minute)
+    {
+        this.day = day;
         this.hour = hour;
         this.minute = minute;
     }

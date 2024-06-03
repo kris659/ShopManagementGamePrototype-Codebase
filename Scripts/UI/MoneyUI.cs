@@ -9,10 +9,14 @@ public class MoneyUI : MonoBehaviour
     void Start()
     {
         PlayerData.instance.OnPlayerMoneyChanged += UpdateUI;
+        UpdateUI(PlayerData.instance.playerMoney);
     }
 
-    void UpdateUI(int playerMoney)
+    void UpdateUI(float playerMoney)
     {
-        moneyText.text = playerMoney.ToString() + "$";
+        if(playerMoney >= 10000)
+            moneyText.text = "$" + playerMoney.ToString("0").Replace(',','.');
+        else
+            moneyText.text = "$" + playerMoney.ToString("0.00").Replace(',', '.');
     }
 }

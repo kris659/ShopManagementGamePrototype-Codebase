@@ -13,6 +13,8 @@ public class VehicleManager : MonoBehaviour
 
     public List<int> startingVehicles = new List<int>();
     public List<Transform> startingVehiclesPoints = new List<Transform>();
+    public List<bool> vehiclesUnlocked = new List<bool>();
+    public List<int> vehiclesUnlockPrices= new List<int>();
 
     public int vehicleToSpawn;
     public bool shouldSpawn = false;
@@ -37,6 +39,21 @@ public class VehicleManager : MonoBehaviour
             shouldSpawn = false;
             SpawnVehicle(startingVehicles[vehicleToSpawn], startingVehiclesPoints[vehicleToSpawn].position, startingVehiclesPoints[vehicleToSpawn].rotation);
         }
+    }
+
+    public void TryToUnlockVehicle(IVehicle vehicle)
+    {
+        int vehicleIndex = GetVehicleIndex(vehicle);
+        string text = "Buy for $" + vehiclesUnlockPrices[vehicleIndex] + "?";
+        UIManager.confirmUI.OpenUI(text, () => OnConfirmButtonClicked(vehicleIndex), null, PlayerData.instance.CanAfford(vehiclesUnlockPrices[vehicleIndex]));        
+    }
+
+    void OnConfirmButtonClicked(int vehicleIndex)
+    {
+        if (!PlayerData.instance.CanAfford(vehiclesUnlockPrices[vehicleIndex]))
+            return;
+        PlayerData.instance.TakeMoney(vehiclesUnlockPrices[vehicleIndex]);
+        vehiclesUnlocked[vehicleIndex] = true;
     }
 
     public VehicleSaveData[] GetVehiclesSaveData()
@@ -70,5 +87,15 @@ public class VehicleManager : MonoBehaviour
         }
         vehiclesSpawned.Clear();
         vehicleCamera.transform.SetParent(null);
+    }
+
+    public bool IsVehicleUnlocked(IVehicle vehicle)
+    {
+        return vehiclesUnlocked[GetVehicleIndex(vehicle)];
+    }
+
+    public int GetVehicleIndex(IVehicle vehicle)
+    {
+        return vehiclesSpawned.IndexOf(vehicle);
     }
 }

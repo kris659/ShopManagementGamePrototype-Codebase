@@ -8,7 +8,6 @@ public class CustomerManager : MonoBehaviour
     [SerializeField] private GameObject customerPrefab;
     [SerializeField] private Transform[] spawnPositions;
     [SerializeField] private float spawnCooldown;
-    [SerializeField] private int maxCustomers;
 
     [SerializeField] private List<Customer> customers;
 
@@ -44,7 +43,7 @@ public class CustomerManager : MonoBehaviour
     private void SpawnCustomer()
     {
         UpdateCustomerList();
-        if (customers.Count >= maxCustomers)
+        if (customers.Count >= ShopData.instance.MaxCustomers || !ShopData.instance.isShopOpen)
             return;
         Vector3 spawnPosition = GetSpawnPosition();
         GameObject customerGO = Instantiate(customerPrefab, spawnPosition, Quaternion.identity, transform);

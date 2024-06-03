@@ -15,10 +15,12 @@ public class LiftController : MonoBehaviour
     {
         CarPhysx carPhysx = GetComponent<CarPhysx>();
         carPhysx.OnVehicleEnter += () => { 
-            UIManager.possibleActionsUI.AddAction("CapsLock/Shift - move lift up/down");
+            UIManager.possibleActionsUI.AddAction("Q - move lift up");
+            UIManager.possibleActionsUI.AddAction("E - move lift down");
         };
         carPhysx.OnVehicleLeave += () => { 
-            UIManager.possibleActionsUI.RemoveAction("CapsLock/Shift - move lift up/down");         
+            UIManager.possibleActionsUI.RemoveAction("Q - move lift up");         
+            UIManager.possibleActionsUI.RemoveAction("E - move lift down");
         };
     }
 

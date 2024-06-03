@@ -3,27 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class CarPhysx : MonoBehaviour, IVehicle
+public class CarPhysx : MonoBehaviour
 {
-    public GameObject PlayerControlling { get; set; }
-    public int PrefabIndex { get; set; }
-
-    public bool IsThirdPersonCamera { get { return isThirdPersonCamera; } set { isThirdPersonCamera = value; } }
-    [SerializeField] private bool isThirdPersonCamera;
-    public GameObject ThirdPersonCamera { get { return thirdPersonCamera; } }
-    [SerializeField] private GameObject thirdPersonCamera;
-
-    public Transform Transform { get { return tr; } }
-    [SerializeField] private Transform tr;
-    public Transform PlayerPosition { get { return playerPosition; } }
-    [SerializeField] private Transform playerPosition;
-    public Transform GettingOutPosition { get { return gettingOutPosition; } }
-    [SerializeField] private Transform gettingOutPosition;
-
-    public float PlayerScale { get { return playerScale; } }
-
-    [SerializeField] private float playerScale;
-
+    [HideInInspector]
+    public bool isPlayerControlling = false;
     [SerializeField] private Transform steeringWheel;
     [SerializeField] private Vector3 steeringWheelRotation;
     [SerializeField] private Transform[] wheels;
@@ -39,7 +22,9 @@ public class CarPhysx : MonoBehaviour, IVehicle
     [SerializeField] private float _carBraking = 1.5f;
 
     [Range(0f, 2f)]
-    [SerializeField] private float _idleDrag;
+    [SerializeField] private float _idleDragForward;
+    [Range(0f, 2f)]
+    [SerializeField] private float _idleDragBackwords;
 
     [SerializeField] private float _suspensionForce;
     [SerializeField] private float _suspesionDamping;
@@ -88,16 +73,20 @@ public class CarPhysx : MonoBehaviour, IVehicle
                 Vector3 suspensionForce = GetSuspensionForce(wheels[i], hit.distance);
                 Vector3 steeringForce = GetSteeringForce(wheels[i]) / rb.mass;
                 Vector3 dragForce = Vector3.zero;
-                if (PlayerControlling == null)
+                float carSpeed = Vector3.Dot(transform.forward, rb.velocity);
+                if (!isPlayerControlling)
                 {
                     Vector3 accelDirection = wheels[i].forward;
-                    float carSpeed = Vector3.Dot(transform.forward, rb.velocity);
-                    if (Mathf.Abs(carSpeed) <= 0.1f) dragForce = -accelDirection * carSpeed * 1;
-                    else
-                        if (Mathf.Abs(carSpeed) <= 0.5f) dragForce = -accelDirection * carSpeed * 0.4f;
-                        else dragForce = -accelDirection * carSpeed * _idleDrag / 5;
-                    if (carSpeed < 0 && dragForce != Vector3.zero) // Nie wiem dlaczego jest obrócony -3.5 stopnia wiêc nie dzia³a bez tego
-                        dragForce += transform.TransformDirection(new Vector3(0, 0, 0.1f));
+                    
+                    float idleDrag = _idleDragForward;
+                    dragForce = -accelDirection * carSpeed * idleDrag / 5;
+
+                    if (Mathf.Abs(carSpeed) <= 0.5f) dragForce *= 2;
+                    if (Mathf.Abs(carSpeed) <= 0.1f) dragForce *= 5;
+                }
+                if(!isPlayerControlling || currentInput.y == 0 && Mathf.Abs(carSpeed) <= 0.2f) {
+                    suspensionForce.x = 0;
+                    suspensionForce.z = 0;
                 }
                 Vector3 finalForce = suspensionForce + steeringForce + dragForce;
                 rb.AddForceAtPosition(finalForce * rb.mass, wheels[i].position);
@@ -184,13 +173,20 @@ public class CarPhysx : MonoBehaviour, IVehicle
         float brakingBonus = 1;
 
         //Debug.Log("input: " + vertical);
-        //Debug.Log("car speed: " + carSpeed);
+        Debug.Log("Car speed: " + carSpeed);
         
         if (vertical == 0)
         {
-            if (Mathf.Abs(carSpeed) <= 0.1f) return -accelDirection * carSpeed * 10;            
-            if (Mathf.Abs(carSpeed) <= 0.5f) return -accelDirection * carSpeed * 0.4f;
-            return -accelDirection * carSpeed * _idleDrag / 5;
+            Vector3 dragForce;
+            float idleDrag = _idleDragForward;
+            if (carSpeed < 0)
+                idleDrag = _idleDragBackwords;
+            dragForce = -accelDirection * carSpeed * idleDrag / 5;
+
+            if (Mathf.Abs(carSpeed) <= 0.5f) dragForce *= 2;
+            if (Mathf.Abs(carSpeed) <= 0.1f) dragForce *= 5;
+
+            return dragForce;
         }
         if (vertical * carSpeed < 0)
         { // Changing direction 

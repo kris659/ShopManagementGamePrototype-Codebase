@@ -15,7 +15,7 @@ public class PlayerPickup : MonoBehaviour
     [SerializeField] private Transform productParent;
     private GameObject productGO;
   
-    public bool IsHoldingObject { get { return productScriptList.Count > 0; } }
+    public bool IsHoldingObject { get { return pickableScriptsList.Count > 0; } }
     public bool IsPlacingObject { get; set; }
 
     private GameObject previewGO;
@@ -24,10 +24,12 @@ public class PlayerPickup : MonoBehaviour
     private float pickupRange = 6;
     private float placingRange = 4;
 
+    private Vector3 defaultSpawnPosition = new Vector3(0,-10,0);
+
     Quaternion placingRotation { get; set; }
 
-    private List<IPickable> productScriptList = new List<IPickable>();
-    private int productsAmount { get { return productScriptList.Count; } }
+    private List<IPickable> pickableScriptsList = new List<IPickable>();
+    private int productsAmount { get { return pickableScriptsList.Count; } }
 
     private void Update()
     {
@@ -62,7 +64,7 @@ public class PlayerPickup : MonoBehaviour
 
     private void TryToPickup()
     {        
-        if (productScriptList.Count > 0 && productsAmount >= productScriptList[productScriptList.Count - 1].HoldingLimit) return;
+        if (pickableScriptsList.Count > 0 && productsAmount >= pickableScriptsList[pickableScriptsList.Count - 1].HoldingLimit) return;
 
         IPickable product = RaycastPickable();
         if(product != null) {
@@ -76,7 +78,7 @@ public class PlayerPickup : MonoBehaviour
 
         RaycastHit hit;
         if (Physics.Raycast(origin, direction, out hit, pickupRange, _pickableLayerMask)) {
-            if (hit.transform.TryGetComponent(out IPickableGO pickableScript)) {
+            if (hit.transform.TryGetComponent(out IPickableGO pickableScript)){
                 return pickableScript.pickable;
             }
 
@@ -89,10 +91,10 @@ public class PlayerPickup : MonoBehaviour
 
     private void Pickup(IPickable pickableScript)
     {
-        if (productScriptList.Count > 0 && productScriptList[0].HoldingLimitID != pickableScript.HoldingLimitID)
+        if (pickableScriptsList.Count > 0 && pickableScriptsList[0].PickableTypeID != pickableScript.PickableTypeID)
             return;
-        productScriptList.Add(pickableScript);
-        UIManager.holdingUI.UpdateText(productsAmount, productScriptList[productsAmount - 1].HoldingLimit);
+        pickableScriptsList.Add(pickableScript);
+        UIManager.holdingUI.UpdateText(productsAmount, pickableScriptsList[productsAmount - 1].HoldingLimit);
         pickableScript.OnPlayerTake(productsAmount == 1, productParent);
         if (productsAmount == 1)
             SetPreviewActive();
@@ -104,9 +106,9 @@ public class PlayerPickup : MonoBehaviour
         GetSpawnPosition(out Vector3 position, out Quaternion rotation);
         if (CanPlace(position, rotation))
         {
-            UIManager.holdingUI.UpdateText(productsAmount - 1, productScriptList[productsAmount - 1].HoldingLimit);
-            productScriptList[productsAmount - 1].Place(position, rotation, null);
-            productScriptList.RemoveAt(productsAmount - 1);
+            UIManager.holdingUI.UpdateText(productsAmount - 1, pickableScriptsList[productsAmount - 1].HoldingLimit);
+            pickableScriptsList[productsAmount - 1].Place(position, rotation, null);
+            pickableScriptsList.RemoveAt(productsAmount - 1);
             
             if (productsAmount == 0) {
                 IsPlacingObject = false;
@@ -121,7 +123,7 @@ public class PlayerPickup : MonoBehaviour
         {
             placingRotation = Quaternion.identity;
 
-            previewGO = productScriptList[0].PreviewGameObject;
+            previewGO = pickableScriptsList[0].PreviewGameObject;
             previewGO.transform.GetChild(0).GetComponent<Renderer>().material = placingPreviewMaterial;
             previewGO.name = "Placing Preview";
             previewGO.SetActive(false);
@@ -171,12 +173,12 @@ public class PlayerPickup : MonoBehaviour
 
         if (emptyGO == null) emptyGO = new GameObject("Placing Empty(Calculations)");
         GameObject previewGO = emptyGO;
-        BoxCollider collider = productScriptList[productsAmount - 1].BoxCollider;
+        BoxCollider collider = pickableScriptsList[productsAmount - 1].BoxCollider;
         //Debug.Log(collider.name);
         Vector3 colliderSize = collider.size;
         //Debug.Log(colliderSize);
 
-        spawnPosition = transform.position;
+        spawnPosition = defaultSpawnPosition;
         Vector3 offset = Vector3.zero;
         Vector3 origin = playerCamera.transform.position;
         Vector3 direction = playerCamera.transform.TransformDirection(Vector3.forward);
@@ -268,7 +270,9 @@ public class PlayerPickup : MonoBehaviour
 
     bool CanPlace(Vector3 spawnPosition, Quaternion rotation)
     {
-        BoxCollider collider = productScriptList[productsAmount - 1].BoxCollider;
+        if(spawnPosition == defaultSpawnPosition) 
+            return false;
+        BoxCollider collider = pickableScriptsList[productsAmount - 1].BoxCollider;
         //Quaternion rotation = Quaternion.Euler(transform.GetChild(0).eulerAngles + collider.transform.localEulerAngles + placingRotation.eulerAngles);
         Vector3 center = spawnPosition + collider.center + collider.transform.localPosition;
         Vector3 halfExtents = collider.size / 2.2f;
@@ -287,7 +291,7 @@ public class PlayerPickup : MonoBehaviour
         
         IPickable product = RaycastPickable();
         if (product != null) {
-            if (productScriptList.Count > 0 && (productScriptList[0].HoldingLimitID != product.HoldingLimitID || productsAmount >= productScriptList[productScriptList.Count - 1].HoldingLimit)) {
+            if (pickableScriptsList.Count > 0 && (pickableScriptsList[0].PickableTypeID != product.PickableTypeID || productsAmount >= pickableScriptsList[pickableScriptsList.Count - 1].HoldingLimit)) {
                 UIManager.possibleActionsUI.RemoveAction("LMB - pickup object");
             }
             else {
@@ -297,11 +301,52 @@ public class PlayerPickup : MonoBehaviour
         else {
             UIManager.possibleActionsUI.RemoveAction("LMB - pickup object");
         }
-        if (productScriptList.Count > 0) {
-            UIManager.possibleActionsUI.AddAction("Hold RMB and click LMB - place object");
+        if (pickableScriptsList.Count > 0) {
+            UIManager.possibleActionsUI.AddAction("Hold RMB and click LMB - place object", 100);
         }
         else {
             UIManager.possibleActionsUI.RemoveAction("Hold RMB and click LMB - place object");
         }
+    }
+
+    public void GetPickupSaveData(out int[] pickedupProducts, out int[] pickedupContainers)
+    {
+        List<int> products = new List<int>();
+        List<int> containers = new List<int>();
+
+        for(int i = 0; i <  pickableScriptsList.Count; i++) {
+            if (pickableScriptsList[i].PickableTypeID >= 0)
+                products.Add(pickableScriptsList[i].PickableID);
+            else
+                containers.Add(pickableScriptsList[i].PickableID);
+        }
+        pickedupProducts = products.ToArray();
+        pickedupContainers = containers.ToArray();
+    }
+
+    public void LoadFromSaveData(int[] pickedupProducts, int[] pickedupContainers)
+    {
+        for(int i = 0; i < pickedupProducts.Length; i++) {
+            Product product = ProductsData.instance.productsSpawned[pickedupProducts[i]];
+            pickableScriptsList.Add(product);
+            if (i == 0) {
+                product.SpawnVisualSavePickup(productParent);
+                SetPreviewActive();
+            }
+        }
+        for (int i = 0; i < pickedupContainers.Length; i++) {
+            Container container = ProductsData.instance.containersSpawned[pickedupContainers[i]];
+            pickableScriptsList.Add(container);
+            if(i == 0) {
+                container.SpawnVisualSavePickup(productParent);
+                SetPreviewActive();
+            }
+        }
+        if(productsAmount > 0)
+            UIManager.holdingUI.UpdateText(productsAmount, pickableScriptsList[productsAmount - 1].HoldingLimit);
+    }
+    public void ClearPickupList()
+    {
+        pickableScriptsList.Clear();
     }
 }

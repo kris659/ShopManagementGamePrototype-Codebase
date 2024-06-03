@@ -8,6 +8,8 @@ public class TextUI : MonoBehaviour
     [SerializeField] private TMP_Text textUI;
     private GameObject textUIGO;
     private string text;
+    private IEnumerator coroutine;
+    private float currentDuration;
     void Start()
     {
         textUIGO = transform.GetChild(0).gameObject;
@@ -20,15 +22,28 @@ public class TextUI : MonoBehaviour
             textUIGO.SetActive(false);
         else 
             textUIGO.SetActive(true);
-        textUI.text = textToDisplay;
 
-        if (duration > 0)
-            StartCoroutine(ClearTextAfter(duration));
+        
+        if(coroutine != null) {
+            if (textToDisplay != textUI.text)
+                StopCoroutine(coroutine);            
+        }
+        currentDuration = duration;
+        textUI.text = textToDisplay;
+        if(duration > 0 && coroutine == null) {
+            coroutine = ClearTextAfter();
+            StartCoroutine(coroutine);
+        }        
     }
 
-    IEnumerator ClearTextAfter(float duration)
+    IEnumerator ClearTextAfter()
     {
-        yield return new WaitForSeconds(duration);        
-        UpdateText(text);
+        while(currentDuration > 0) {
+            float duration = Mathf.Min(currentDuration, 0.1f);
+            currentDuration -= duration;
+            yield return new WaitForSeconds(duration);
+        }        
+        UpdateText("");
+        coroutine = null;
     }
 }

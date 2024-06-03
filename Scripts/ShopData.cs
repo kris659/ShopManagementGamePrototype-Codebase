@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class ShopData : MonoBehaviour
@@ -14,7 +15,7 @@ public class ShopData : MonoBehaviour
     public List<Shelf> shelvesList = new List<Shelf>();
     [SerializeField] List<Shelf> shelvesWithProductsList = new List<Shelf>();
 
-    [SerializeField] List<CashRegister> registersList = new List<CashRegister>();
+    public List<CashRegister> registersList = new List<CashRegister>();
     [SerializeField] List<CashRegister> activeRegistersList = new List<CashRegister>();
 
     [SerializeField] List<Wall> wallsList = new List<Wall>();
@@ -22,6 +23,11 @@ public class ShopData : MonoBehaviour
     public Action<bool> onShopOpenStatusChanged;
 
     public LayerMask shelfTriggerLayer;
+
+    public List<GameObject> floorsToUnlock = new List<GameObject>();
+
+    public int MaxCustomers { get; private set; }
+
     private void Awake()
     {
         if (instance != null)
@@ -40,8 +46,9 @@ public class ShopData : MonoBehaviour
     public int AddShelf(Shelf shelf)
     {
         shelvesList.Add(shelf);
+        UpdateMaxCustomers();
         return shelvesList.Count - 1;
-    }   
+    }
 
     public void AddRegister(CashRegister register)
     {
@@ -53,14 +60,18 @@ public class ShopData : MonoBehaviour
         wallsList.Add(wall);
     }
 
-    public int RemoveShelf(Shelf shelf)
+    public void RemoveShelf(Shelf shelf)
     {
+        if(shelvesWithProductsList.Contains(shelf))
+            shelvesWithProductsList.Remove(shelf);
         shelvesList.Remove(shelf);
-        return shelvesList.Count - 1;
+        UpdateMaxCustomers();
     }
 
     public void RemoveRegister(CashRegister register)
     {
+        if(activeRegistersList.Contains(register))
+            activeRegistersList.Remove(register);
         registersList.Remove(register);
     }
 
@@ -75,23 +86,53 @@ public class ShopData : MonoBehaviour
             shelvesWithProductsList.Add(shelf);
         if (shelf.products.Count <= 0 && shelvesWithProductsList.Contains(shelf))
             shelvesWithProductsList.Remove(shelf);
+        UpdateMaxCustomers();
+    }
+
+    private void UpdateMaxCustomers()
+    {
+        int maxCustomers = shelvesList.Count + shelvesWithProductsList.Count;
+        maxCustomers = Math.Max(5, maxCustomers);
+        maxCustomers = Math.Min(50, maxCustomers);
+        MaxCustomers = maxCustomers;
     }
 
     public void UpdateRegisterStatus(CashRegister register)
     {
-        if (register.isActive && !activeRegistersList.Contains(register))
-            activeRegistersList.Add(register);
-        if (!register.isActive && activeRegistersList.Contains(register))
-            activeRegistersList.Remove(register);
+        if (register.IsOpen && !register.IsFull) {
+            if (!activeRegistersList.Contains(register))
+                activeRegistersList.Add(register);
+        }            
+        else {
+            if (activeRegistersList.Contains(register))
+                activeRegistersList.Remove(register);
+        }        
     }
     
-
     public CashRegister GetActiveRegister()
     {
         if (activeRegistersList.Count == 0)
             return null;
         return activeRegistersList[UnityEngine.Random.Range(0, activeRegistersList.Count)];
     }
+
+    public ShelfTrigger GetEmptyShelfTrigger()
+    {
+        foreach (Shelf shelf in shelvesList) { 
+            foreach (ShelfTrigger shelfTrigger in shelf.shelfTriggers) {
+                if (shelfTrigger.productsInArea.Count == 0) 
+                    return shelfTrigger;
+            }
+        }
+        return null;
+    }
+
+    public void ChangeShopOpenStatus(bool isOpen)
+    {
+        isShopOpen = isOpen;
+    }
+
+
     public void LoadFromSaveData(SaveData saveData)
     {
         for(int i = 0; i < saveData.shelvesData.Length; i++) {
@@ -105,6 +146,10 @@ public class ShopData : MonoBehaviour
         for (int i = 0; i < saveData.wallsData.Length; i++) {
             WallSaveData wallSaveData = saveData.wallsData[i];
             Wall.Spawn(wallSaveData.wallTypeIndex, wallSaveData.position, wallSaveData.rotation);
+        }
+        VehicleManager.instance.vehiclesUnlocked = saveData.shopData.unlockedCars.ToList();
+        for(int i = 0; i < saveData.shopData.unlockedLand.Length; i++) {
+            floorsToUnlock[i].SetActive(saveData.shopData.unlockedLand[i]);
         }
     }
 
@@ -154,5 +199,14 @@ public class ShopData : MonoBehaviour
         registersList.Clear();
         activeRegistersList.Clear();
         wallsList.Clear();
+    }
+
+    public ShopSaveData GetSaveData()
+    {
+        bool[] unlockedLand = new bool[floorsToUnlock.Count];
+        for(int i = 0; i < unlockedLand.Length; i++) {
+            unlockedLand[i] = floorsToUnlock[i].activeSelf;
+        }
+        return new ShopSaveData(VehicleManager.instance.vehiclesUnlocked.ToArray(), unlockedLand);
     }
 }

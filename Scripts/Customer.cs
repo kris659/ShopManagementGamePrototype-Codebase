@@ -11,6 +11,7 @@ public class Customer : MonoBehaviour
     [SerializeField] int customerVariations;
     public CustomerState customerState = CustomerState.Shopping;
     public List<Product> productsTaken = new List<Product>();
+    public List<float> productsTakenPrices = new List<float>();
 
     private int money;
 
@@ -18,9 +19,10 @@ public class Customer : MonoBehaviour
     private Animator animator;
 
     private Vector3 spawnPoint;
+    private IEnumerator currentGoToCoroutine;
+
     public void Init(int money)
     {
-        //Debug.Log("Customer money: " + money);
         this.money = money;
         StartCoroutine(SelectAction());
         spawnPoint = transform.position;
@@ -32,7 +34,6 @@ public class Customer : MonoBehaviour
                 continue;
             Destroy(modelParent.transform.GetChild(i).gameObject);
         }
-
     }
 
     private void Awake()
@@ -58,14 +59,26 @@ public class Customer : MonoBehaviour
             if (shelf == null)
                 continue;
             yield return StartCoroutine(GoTo(shelf.customerDestination.position));
-            Product product = shelf.TakeRandomProduct();
-            yield return new WaitForSeconds(1.5f);
-            if (product != null){
+            Product product = shelf.GetRandomProduct();
+            if (product != null && TakeDecision(product)) {
+                product.DestroyGameObject();
                 productsTaken.Add(product);
+                productsTakenPrices.Add(PriceManager.instance.GetProductSellPrice(product.productType));
                 UpdateCustomerMoney();
             }
+            yield return new WaitForSeconds(1.5f);
         }
         yield return new WaitForSeconds(1.5f);
+    }
+
+    bool TakeDecision(Product product)
+    {
+        float marketPrice = PriceManager.instance.GetProductMarketPrice(product.productType);
+        float price = PriceManager.instance.GetProductSellPrice(product.productType);
+
+        float chance = 50 + Mathf.RoundToInt((marketPrice - price) / marketPrice * 100);
+        Debug.Log("Chance: " + chance);
+        return Random.Range(0, 100) < chance;
     }
 
     IEnumerator CheckoutCoroutine()
@@ -73,14 +86,19 @@ public class Customer : MonoBehaviour
         while(productsTaken.Count > 0){
             CashRegister cashRegister = ShopData.instance.GetActiveRegister();
             if(cashRegister == null) {
-                Debug.Log("Nie ma ¿adnej otwartej kasy!");
-                UIManager.textUI.UpdateText("There is no open cash register", 2f);
-                yield return new WaitForSeconds(0.5f);
+                //Debug.Log("Nie ma ¿adnej otwartej kasy!");
+                UIManager.textUI.UpdateText("There is no open cash register", 1f);
+                yield return new WaitForSeconds(1f);
             }
             else{
-                yield return cashRegister.StartCoroutine(GoTo(cashRegister.customerDestination.position));
-                yield return cashRegister.StartCoroutine(cashRegister.HandleCustomer(this));
-            }            
+                yield return StartCoroutine(GoTo(cashRegister.customerDestination.position));
+                if(cashRegister != null) {
+                    cashRegister.AddCustomer(this);
+                    yield return new WaitUntil(() => cashRegister == null || !cashRegister.IsCustomer(this));
+                    for(int i = 0; i < productsTaken.Count; i++)
+                        productsTaken[i].DestroyGameObject();
+                }
+            }
         }
     }
 
@@ -91,13 +109,21 @@ public class Customer : MonoBehaviour
         Destroy(gameObject);
     }
     public IEnumerator GoTo(Vector3 destination)
-    {
-        agent.SetDestination(destination);        
-        animator.SetBool("isWalking", true);
-        while(Vector3.Distance(transform.position, destination) > 0.5f) {
-            yield return new WaitForSeconds(0.2f);
+    {        
+        IEnumerator GoToInternal(Vector3 destination)
+        {
+            agent.SetDestination(destination);
+            animator.SetBool("isWalking", true);
+            while (Vector3.Distance(transform.position, destination) > 0.5f) {
+                yield return new WaitForSeconds(0.2f);
+            }
+            animator.SetBool("isWalking", false);
         }
-        animator.SetBool("isWalking", false);
+        if (currentGoToCoroutine != null)
+            StopCoroutine(currentGoToCoroutine);
+        currentGoToCoroutine = GoToInternal(destination);
+        yield return StartCoroutine(currentGoToCoroutine);
+        currentGoToCoroutine = null;
     }
 
     private void UpdateCustomerMoney()
