@@ -8,7 +8,6 @@ public class PauseMenuUI : WindowUI
 {
     [SerializeField] private List<Button> buttons;
     [SerializeField] private SettingsUI settingsUI;
-    [SerializeField] private SavingUI saveUI;
 
     internal override void Awake()
     {
@@ -16,9 +15,9 @@ public class PauseMenuUI : WindowUI
         buttons[0].onClick.AddListener(OnContinueButtonPressed);
         buttons[1].onClick.AddListener(OnSaveButtonPressed);
         buttons[2].onClick.AddListener(OnSettingsButtonPressed);
-        buttons[3].onClick.AddListener(OnQuitGameButtonPressed);
+        buttons[3].onClick.AddListener(OnQuitToMenuButtonPressed);
+        buttons[4].onClick.AddListener(OnQuitGameButtonPressed);
         settingsUI.Init(windowsManager);
-        saveUI.Init(windowsManager);
     }
     public override void OpenUI()
     {
@@ -39,8 +38,7 @@ public class PauseMenuUI : WindowUI
 
     private void OnSaveButtonPressed()
     {
-        saveUI.OpenUI();
-        Time.timeScale = 0;
+        SavingManager.instance.Save();
     }
 
     private void OnSettingsButtonPressed()
@@ -49,8 +47,17 @@ public class PauseMenuUI : WindowUI
         Time.timeScale = 0;
     }
 
+    private void OnQuitToMenuButtonPressed()
+    {
+        SavingManager.instance.Save();
+        CloseUI();
+        SavingManager.instance.ClearScene();
+        MainMenu.instance.OpenMainMenu();
+    }
+
     private void OnQuitGameButtonPressed()
     {
+        SavingManager.instance.Save();
         Application.Quit();
     }
 }

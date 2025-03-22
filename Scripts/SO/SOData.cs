@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class SOData : MonoBehaviour
@@ -12,83 +11,36 @@ public class SOData : MonoBehaviour
     [SerializeField] private ContainerSO[] _containersList;
     public static ContainerSO[] containersList;
 
-    public static List<ProductSO> sellableProductsList = new List<ProductSO>();
+    [SerializeField] private BuildingSO[] _buildingsList;
+    public static BuildingSO[] buildingsList;
 
-    [SerializeField] private ShelfSO[] _shelvesList;
-    public static ShelfSO[] shelvesList;
-
-    [SerializeField] private RegisterSO[] _registersList;
-    public static RegisterSO[] registersList;
-
-    [SerializeField] private WallSO[] _wallsList;
-    public static WallSO[] wallsList;
-
-    public enum BuildingTypes
-    {
-        Shelf,
-        Register,
-        Wall,
-        Decoration,
-    }
-
-    private static string[] buildingTypesNames = {"Shelves", "Registers", "Walls", "Decorations"};
-
-    public static BuildingTypes[] buildingTypesOrder;
-    [SerializeField] private BuildingTypes[] _buildingTypesOrder;
+    [SerializeField] private FurnitureBoxSO[] _furnitureBoxList;
+    public static FurnitureBoxSO[] furnitureBoxList;
 
     void Awake()
     {
         productsList = _productsList;
         containersList = _containersList;
-        shelvesList = _shelvesList;
-        registersList = _registersList;
-        wallsList = _wallsList;
-        buildingTypesOrder = _buildingTypesOrder;
-
-        for(int i = 0; i < productsList.Length; i++) {
-            if (productsList[i].canBeSold)
-                sellableProductsList.Add(productsList[i]);
-        }
-    }
+        buildingsList = _buildingsList;
+        furnitureBoxList = _furnitureBoxList;
+    }    
 
     public static int GetProductIndex(ProductSO product)
     {
         return Array.IndexOf(productsList, product);
     }
 
-    public static IBuildableSO GetBuildableSO(int buildingTypeIndex, int buildingIndex)
+    public static int GetContainerIndex(ContainerSO continer)
     {
-        Debug.Log(buildingTypeIndex + "  " + buildingIndex);
-        int index = (int)buildingTypesOrder[buildingTypeIndex];
-
-        return index switch {
-            0 => shelvesList[buildingIndex],
-            1 => registersList[buildingIndex],
-            2 => wallsList[buildingIndex],
-            _ => null,
-        };
+        return Array.IndexOf(containersList, continer);
     }
 
-    public static IListable[] GetListables(int buildingTypeIndex)
+    public static int GetBuildingIndex(BuildingSO building)
     {
-        int index = (int)buildingTypesOrder[buildingTypeIndex];
-
-        return index switch {
-            0 => shelvesList,
-            1 => registersList,
-            2 => wallsList,
-            _ => new IListable[0],
-        };
+        return Array.IndexOf(buildingsList, building);
     }
-
-    public static string[] GetBuildingTypesNames()
+    public static int GetFurnitureBoxIndex(FurnitureBoxSO furnitureBox)
     {
-        string[] names = new string[buildingTypesNames.Length];
-
-        for(int i = 0; i < names.Length; i++) {
-            int index = (int)buildingTypesOrder[i];
-            names[i] = buildingTypesNames[index];
-        }
-        return names;
+        return Array.IndexOf(furnitureBoxList, furnitureBox);
     }
 }

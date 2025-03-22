@@ -22,6 +22,7 @@ public class WorkersUI : WindowUI
         foreach(int value in Enum.GetValues(typeof(WorkerTask))) {
             workersActions.Add(((WorkerTask)value).ToString());
         }
+        workersActions.RemoveAt(workersActions.Count - 1);
     }
 
 
@@ -35,6 +36,12 @@ public class WorkersUI : WindowUI
     {
         DestroyChildren(workersListParent);
         workersList.Clear();
+        hireButton.interactable = PlayerData.instance.CanAfford(WorkersManager.instance.hirePrice);
+        hireButton.transform.GetChild(0).GetComponent<TMP_Text>().text = "Hire - $" + WorkersManager.instance.hirePrice;
+
+        RectTransform rectTransform = workersListParent.GetComponent<RectTransform>();
+        rectTransform.sizeDelta = new Vector2(rectTransform.sizeDelta.x, 4 + 83 * WorkersManager.instance.workers.Count);
+        rectTransform.localPosition = Vector3.zero;
 
         for (int i = 0; i < WorkersManager.instance.workers.Count; i++) {
             GameObject buttonGO = Instantiate(workersListElementPrefab, workersListParent);

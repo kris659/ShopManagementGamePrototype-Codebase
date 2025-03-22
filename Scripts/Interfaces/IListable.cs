@@ -6,4 +6,5 @@ public interface IListable
 {
     public string Name { get; }
     public int Price { get; }
+    public Sprite Icon { get; }
 }

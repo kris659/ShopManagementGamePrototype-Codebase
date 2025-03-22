@@ -5,7 +5,7 @@ using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
 
-public class CashRegister : MonoBehaviour, IBuildable
+public class CashRegister: Building
 {
     [SerializeField] private TMP_Text openText;
     [SerializeField] private TMP_Text fullText;
@@ -19,30 +19,31 @@ public class CashRegister : MonoBehaviour, IBuildable
     public bool isWorker = false;
     public bool IsFull { get { return customers.Count >= maxCustomers; } }
     public bool IsOpen { get { return isPlayer || isWorker; } }
+    public int CustomerCount { get { return customers.Count; } }
+
     public int maxCustomers;
     List<Customer> customers = new List<Customer>();
     [SerializeField] private List<Transform> customerQueuePositions = new List<Transform>();
     public Transform customerDestination;
     public Transform workerDestination;
-    public Action OnDestroy;
+    public Action OnDestroyEvent;
 
     private List<Product> productsOnRegister = new List<Product>();
     [SerializeField] private BoxCollider productsSpawnCollider;
     [SerializeField] private Transform productsParent;
 
-    public static void Spawn(int typeIndex, Vector3 position, Quaternion rotation)
+    public override void Build()
     {
-        GameObject registerGO = Instantiate(SOData.registersList[typeIndex].Prefab, position, rotation);
-        CashRegister register = registerGO.GetComponent<CashRegister>();
-        TriggerHandler triggerHandler = registerGO.GetComponentInChildren<TriggerHandler>();
+        base.Build();
+        TriggerHandler triggerHandler = GetComponentInChildren<TriggerHandler>();
 
-        triggerHandler.triggerEnter += register.TriggerEnter;
-        triggerHandler.triggerExit += register.TriggerExit;        
+        triggerHandler.triggerEnter += TriggerEnter;
+        triggerHandler.triggerExit += TriggerExit;
 
-        if (register.maxCustomers != register.customerQueuePositions.Count)
+        if (maxCustomers != customerQueuePositions.Count)
             Debug.LogError("MaxCustomers != customerPositions.Count");
-        ShopData.instance.AddRegister(register);
-        register.UpdateStatus();
+        ShopData.instance.AddRegister(this);
+        UpdateStatus();
     }
 
     public bool IsCustomer(Customer customer)
@@ -70,21 +71,39 @@ public class CashRegister : MonoBehaviour, IBuildable
         }
         Customer firstCustomer = customers[0];
         yield return firstCustomer.GoTo(customerQueuePositions[0].position);
-        SpawnProducts();
-        //Debug.Log("Start checkout");
-        for (int i = firstCustomer.productsTaken.Count - 1; i >= 0; i--){
-            yield return new WaitForSeconds(checkoutTime);
-            if (!IsOpen){
+        
+        while(firstCustomer.productsTaken.Count > 0) {
+            if (!IsOpen) {
                 customers.Clear();
                 yield break;
             }
-            PlayerData.instance.AddMoney(firstCustomer.productsTakenPrices[i]);
-            productsOnRegister.Remove(firstCustomer.productsTaken[i]);            
-            firstCustomer.productsTaken[i].DestroyGameObject();
-            firstCustomer.productsTaken.RemoveAt(i);
-            if (productsOnRegister.Count == 0 && firstCustomer.productsTaken.Count != 0)
-                SpawnProducts();
+            SpawnProducts();
+            while (productsOnRegister.Count > 0) {
+                yield return new WaitUntil( () => { return isWorker || !isPlayer || productsOnRegister.Count == 0; });
+                if(isWorker && productsOnRegister.Count > 0) {
+                    yield return new WaitForSeconds(checkoutTime);
+                    if (!IsOpen) {
+                        customers.Clear();
+                        productsOnRegister.Clear();
+                        yield break;
+                    }
+                    if (isWorker && productsOnRegister.Count > 0) {
+                        int lastIndex = firstCustomer.productsTaken.Count - 1;
+                        productsOnRegister.Remove(firstCustomer.productsTaken[lastIndex]);
+                        firstCustomer.RemoveProductFromList(lastIndex);
+                        AudioManager.PlaySound(Sound.ProductScan, transform.position);
+                    }                    
+                }
+                if (!IsOpen) {
+                    customers.Clear();
+                    productsOnRegister.Clear();
+                    yield break;
+                }
+            }
         }
+        if(!isWorker && isPlayer)
+            TasksManager.instance.ProgressTasks(TaskType.ServeCustomers, 1);
+        AudioManager.PlaySound(Sound.CheckoutFinished, transform.position);
         customers.RemoveAt(0);
         for (int i = 0; i < customers.Count; i++) {
             customers[i].StartCoroutine(customers[i].GoTo(customerQueuePositions[i].position));
@@ -94,19 +113,31 @@ public class CashRegister : MonoBehaviour, IBuildable
             StartCoroutine(CheckoutCustomers());
         }
     }
-    
+
+    public void PlayerRemoveProduct(Product product)
+    {
+        productsOnRegister.Remove(product);
+        customers[0].RemoveProductFromList(customers[0].productsTaken.IndexOf(product));
+        AudioManager.PlaySound(Sound.ProductScan, transform.position);
+    }
+
     private void SpawnProducts()
     {
+        AudioManager.PlaySound(Sound.CustomerPutOnRegister, transform.position);
         List<Product> productsReversed = new List<Product>(customers[0].productsTaken);
         productsReversed.Reverse();
-        ProductsData.instance.GetInTriggerPositions(productsReversed, productsSpawnCollider, out List<Vector3> positions, false);
+        productsOnRegister.Clear();
+        ProductsData.instance.GetInTriggerPositions(productsReversed, productsSpawnCollider, out List<Vector3> positions);
         for (int i = 0; i < positions.Count; i++) {
             productsOnRegister.Add(productsReversed[i]);
-            Vector3 position = positions[i] + productsSpawnCollider.transform.position - productsSpawnCollider.transform.localScale * 0.5f;
-            Quaternion rotation = transform.rotation;
+            Vector3 position = productsSpawnCollider.transform.position + transform.rotation * (-positions[i] + new Vector3(0, -productsSpawnCollider.size.y, 0) * 0.5f);
+            Quaternion rotation = Quaternion.Euler(transform.eulerAngles);
             productsReversed[i].SpawnVisual(position, rotation, productsParent);
+            CashRegisterProduct cashRegisterProduct = productsReversed[i].productGO.AddComponent<CashRegisterProduct>();
+            cashRegisterProduct.Init(this, productsReversed[i]);
+            productsReversed[i].productGO.transform.rotation = rotation;
         }
-        productsParent.localEulerAngles += transform.localEulerAngles + new Vector3(0, 180, 0);
+        //productsParent.localEulerAngles += transform.localEulerAngles + new Vector3(0, 180, 0);
     }
 
     private void TriggerEnter(Collider other)
@@ -153,19 +184,12 @@ public class CashRegister : MonoBehaviour, IBuildable
         }
         ShopData.instance.UpdateRegisterStatus(this);
     }
-    public bool CanBuildHere(Vector3 position, Quaternion rotation)
-    {
-        return true;
-    }
 
-    public void Build(int typeIndex, Vector3 position, Quaternion rotation)
-    {
-        Spawn(typeIndex, position, rotation);
-    }
-    public void Destroy()
+
+    private void OnDestroy()
     {
         ShopData.instance.RemoveRegister(this);
-        OnDestroy?.Invoke();
+        OnDestroyEvent?.Invoke();
         customers.Clear();
         StopAllCoroutines();
         Destroy(gameObject);

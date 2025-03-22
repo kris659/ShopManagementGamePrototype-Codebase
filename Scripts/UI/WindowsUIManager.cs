@@ -28,11 +28,31 @@ public class WindowsUIManager : WindowUI
 
     internal virtual void Update()
     {
+        if (MainMenu.isMainMenuOpen)
+            return;
         for (int i = 0; i < windowsUI.Count; i++) {
             if (Input.GetKeyDown(windowsUIKeyCode[i]) && (currentlyOpenWindow == null || currentlyOpenWindow.canClose)) {
                 OpenWindow(windowsUI[i]);
             }
         }        
+    }
+
+    public override void OpenUI()
+    {
+        base.OpenUI();
+        if (currentlyOpenWindow != null) {
+            currentlyOpenWindow.OpenUI();
+        }
+    }
+
+    public Button GetWindowUIButton(WindowUI windowUI)
+    {
+        for(int i = 0;i < windowsUI.Count;i++) {
+            if (windowsUI[i] == windowUI && buttons.Count > i) {
+                return buttons[i];
+            }
+        }
+        return null;
     }
 
     internal virtual void OpenWindow(WindowUI windowUI)

@@ -20,15 +20,17 @@ public class OrdersUI : WindowUI
 
 
     [SerializeField] private GameObject comingSoonText;
+    [SerializeField] private GameObject unlockText;
     [SerializeField] private Button orderButton;
     [SerializeField] private TMP_Text totalPriceText;
 
     Dictionary<ProductSO, int> orderDictionary = new Dictionary<ProductSO, int>();
 
     private int minValue = 0;
-    private int maxValue = 200;
+    private int maxValue = 108;
 
-    private int totalPrice;
+    private float totalPrice;
+    private int boxesCount;
     private int currentCategoryIndex = 0;
 
     private OrdersManager ordersManager;
@@ -41,6 +43,12 @@ public class OrdersUI : WindowUI
         this.ordersManager = ordersManager;
         orderButton.onClick.AddListener(OnOrderButtonClicked);
         productsListInputFields = new List<TMP_InputField>();
+        StartCoroutine(InitCoroutine());
+    }
+
+    private IEnumerator InitCoroutine()
+    {
+        yield return new WaitForEndOfFrame();
         InitCategoryList();
         UpdateTotalPrice();
     }
@@ -66,7 +74,7 @@ public class OrdersUI : WindowUI
             int index = i;
             categoryButton.onClick.AddListener(() => { OnCategoryButtonPressed(index); });
         }
-        UpdateProductsList(currentCategoryIndex);
+        //UpdateProductsList(currentCategoryIndex);
     }
 
     private void UpdateProductsList(int categoryIndex)
@@ -74,8 +82,20 @@ public class OrdersUI : WindowUI
         currentCategoryIndex = categoryIndex;
         DestroyChildren(productsListParent);
         productsListInputFields.Clear();
-        currentProducts = ProductsData.instance.GetCategoryProducts(categoryIndex);
+        currentProducts = ProductsData.instance.productsLicenses[categoryIndex].products;
+
         comingSoonText.SetActive(currentProducts.Length == 0);
+        unlockText.SetActive(currentProducts.Length != 0 && !ProductsData.instance.unlockedProductsLicenses[categoryIndex]);
+
+        RectTransform rectTransform = productsListParent.GetComponent<RectTransform>();
+
+        if (!ProductsData.instance.unlockedProductsLicenses[categoryIndex]) {
+            rectTransform.sizeDelta = new Vector2(rectTransform.sizeDelta.x, 0);
+            return;
+        }
+
+        rectTransform.sizeDelta = new Vector2(rectTransform.sizeDelta.x, 82.5f * currentProducts.Length);
+        rectTransform.localPosition = Vector3.zero;
         for (int i = 0; i < currentProducts.Length; i++) {
             GameObject productListElement = Instantiate(productsListElementPrefab, productsListParent).gameObject;
             productListElement.SetActive(true);
@@ -87,9 +107,11 @@ public class OrdersUI : WindowUI
 
             ProductSO product = currentProducts[i];
             nameText.text = product.Name;
-            priceText.text = "$" + product.Price;
+            float price = PriceManager.instance.GetWholesalePrice(product);
+            int inBoxCount = ordersManager.GetProductBoxCapacity(product); 
+            priceText.text = ("$" + (price * inBoxCount).ToString("0.00") + " (" + inBoxCount + " x $" + price.ToString("0.00") + ")").Replace(',', '.');
 
-            if(orderDictionary.TryGetValue(product, out int value))
+            if (orderDictionary.TryGetValue(product, out int value))
                 amountInputField.text = value.ToString();
             else
                 amountInputField.text = "0";
@@ -110,11 +132,13 @@ public class OrdersUI : WindowUI
         foreach (ProductSO productSO in keys) {
             GameObject orderListElement = Instantiate(ordersListElementPrefab, ordersListParent).gameObject;
             orderListElement.SetActive(true);
-            TMP_Text nameText = orderListElement.transform.GetChild(0).GetComponent<TMP_Text>();
-            TMP_Text priceText = orderListElement.transform.GetChild(1).GetComponent<TMP_Text>();
+            TMP_Text nameText = orderListElement.transform.GetChild(1).GetComponent<TMP_Text>();
+            TMP_Text priceText = orderListElement.transform.GetChild(2).GetComponent<TMP_Text>();
+            TMP_Text discountText = orderListElement.transform.GetChild(3).GetComponent<TMP_Text>();
 
-            nameText.text = productSO.Name + " x" + orderDictionary[productSO];
-            priceText.text = "$" + productSO.Price * orderDictionary[productSO];
+            nameText.text = productSO.Name + " x " + orderDictionary[productSO];
+            priceText.text = "$" + (orderDictionary[productSO] * PriceManager.instance.GetWholesalePrice(productSO) * ordersManager.GetProductBoxCapacity(productSO)).ToString("0.00").Replace(",", ".");
+            discountText.text = "-" + ordersManager.GetDiscount(orderDictionary[productSO]) + "%";
         }
     }
 
@@ -142,10 +166,11 @@ public class OrdersUI : WindowUI
             Debug.LogError("Button should not be enabled");
             return;
         }
-        //PlayerData.instance.TakeMoney(totalPrice);
         ordersManager.SpawnProducts(orderDictionary);
-        //orderDictionary.Clear();
+        AudioManager.PlaySound(Sound.PlayerOrder);
+        TasksManager.instance.ProgressTasks(TaskType.OrderBoxesAtOnce, boxesCount);
         CloseUI();
+        UIManager.infoUI.OpenUI();
     }
 
     private void OnInputFieldValueChanged(int inputFieldIndex, string textValue)
@@ -154,7 +179,8 @@ public class OrdersUI : WindowUI
         if (value < minValue) value = minValue;
         if (value > maxValue) value = maxValue;
         productsListInputFields[inputFieldIndex].text = value.ToString();
-
+        if (value == 0)
+            productsListInputFields[inputFieldIndex].MoveTextEnd(false); //.se = productsListInputFields[inputFieldIndex].text.Length;
         if (value == 0 && orderDictionary.ContainsKey(currentProducts[inputFieldIndex]))
             orderDictionary.Remove(currentProducts[inputFieldIndex]);
         if (value != 0)
@@ -167,10 +193,12 @@ public class OrdersUI : WindowUI
     {
         ProductSO[] keys = orderDictionary.Keys.ToArray();
         totalPrice = 0;
-        foreach(ProductSO productSO in keys) {
-            totalPrice += productSO.Price * orderDictionary[productSO];
+        boxesCount = 0;
+        foreach (ProductSO productSO in keys) {
+            boxesCount += orderDictionary[productSO];
+            totalPrice += orderDictionary[productSO] * PriceManager.instance.GetWholesalePrice(productSO) * ordersManager.GetProductBoxCapacity(productSO) * (100 - ordersManager.GetDiscount(orderDictionary[productSO])) / 100;
         }
-        totalPriceText.text = "Total: $" + totalPrice;
+        totalPriceText.text = "Total: $" + totalPrice.ToString("0.00").Replace(',', '.');
         orderButton.interactable = PlayerData.instance.CanAfford(totalPrice);
         UpdateOrderList();
     }

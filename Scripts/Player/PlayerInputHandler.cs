@@ -17,6 +17,8 @@ public class PlayerInputHandler : MonoBehaviour
     private bool _buttonR;
     private bool _buttonZ;
     private bool _buttonX;
+    private bool _buttonH;
+    private bool _buttonL;
     private bool _buttonCapsLock;
     private bool _buttonShift;
     private bool _buttonJump;
@@ -73,6 +75,12 @@ public class PlayerInputHandler : MonoBehaviour
         data.buttonX = _buttonX;
         _buttonX = false;
 
+        data.buttonH = _buttonH;
+        _buttonH = false;
+
+        data.buttonL = _buttonL;
+        _buttonL = false;
+
         data.buttonShift = _buttonShift;
         _buttonShift = false;
 
@@ -102,6 +110,8 @@ public class PlayerInputHandler : MonoBehaviour
         _buttonR = _buttonR | Input.GetKeyDown(KeyCode.R);
         _buttonZ = _buttonZ | Input.GetKeyDown(KeyCode.Z);
         _buttonX = _buttonX | Input.GetKeyDown(KeyCode.X);
+        _buttonH = _buttonH | Input.GetKeyDown(KeyCode.H);
+        _buttonL = _buttonL | Input.GetKeyDown(KeyCode.L);
         _buttonCapsLock = _buttonCapsLock | Input.GetKey(KeyCode.CapsLock);
         _buttonShift = _buttonShift | Input.GetKey(KeyCode.LeftShift);
         _buttonJump = _buttonJump | Input.GetKeyDown(KeyCode.Space);

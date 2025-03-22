@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class Product: IPickable
@@ -11,17 +12,25 @@ public class Product: IPickable
 
     public bool isTakenByCustomer;
     public bool isInClosedContainer;
-    public List<IPlacingTriggerArea> placingTriggerAreas = new List<IPlacingTriggerArea>();
+    public List<PlacingTriggerArea> placingTriggerAreas = new List<PlacingTriggerArea>();
 
     public int HoldingLimit => productType.holdingLimit;
     public int PickableTypeID => productTypeIndex;
     public int PickableID => ProductsData.instance.productsSpawned.IndexOf(this);
 
+    public bool CanPickableInteract => false;
+    public string PickableInteractionText => string.Empty;
+    public void OnPickableInteract() { }
+
     public BoxCollider BoxCollider => productType.prefab.GetComponentInChildren<BoxCollider>();
 
-    public GameObject PreviewGameObject => GameObject.Instantiate(productType.visualPrefab);
+    public GameObject PreviewGameObject => ProductGO.SpawnVisual(productType);
     public GameObject GameObject => productGO.gameObject;
 
+    public List<IPickable> AdditionalPickables => new();
+    public void RemoveLastAdditionalPickable() { }
+
+    private int vehicleAreasCount = 0;
     public Product(int typeIndex)
     {
         this.productTypeIndex = typeIndex;
@@ -35,15 +44,15 @@ public class Product: IPickable
         this.productType = SOData.productsList[typeIndex];
         ProductsData.instance.productsSpawned.Add(this);
         if (isPhysxSpawned)
-            Place(position, rotation, null);
-    }
+            Place(position, rotation, null, false);
+    }    
 
-    public void Place(Vector3 position, Quaternion rotation, Transform parent)
+    private void SpawnVisual(Transform parent)
     {
-        DestroyGameObject();
-        productGO = ProductGO.Spawn(false, position, rotation, parent, this);
-
-        UpdatePlacingTriggerAreas(position, rotation);        
+        productGO = ProductGO.Spawn(true, Vector3.zero, Quaternion.identity, parent, this);
+        productGO.transform.localPosition = productType.holdingPosition;
+        productGO.transform.localRotation = Quaternion.Euler(productType.holdingRotation);
+        productGO.transform.localScale = Vector3.one;
     }
 
     public void SpawnVisual(Vector3 position, Quaternion rotation, Transform parent)
@@ -52,40 +61,23 @@ public class Product: IPickable
         productGO = ProductGO.Spawn(true, position, rotation, parent, this);
     }
 
+    public void Place(Vector3 position, Quaternion rotation, Transform parent, bool playSound)
+    {
+        DestroyGameObject();
+        productGO = ProductGO.Spawn(false, position, rotation, parent, this);
+
+        if(playSound)
+            AudioManager.PlaySound(Sound.ProductDrop, position, productGO.transform);
+    }    
+
     public void OnPlayerTake(bool shoudSpawnVisual, Transform parent)
     {
         DestroyGameObject();
         if (shoudSpawnVisual) {
             SpawnVisual(parent);
-        }     
-    }
-
-    private void SpawnVisual(Transform parent)
-    {
-        productGO = ProductGO.Spawn(true, Vector3.zero, Quaternion.identity, parent, this);
-        productGO.transform.localPosition = productType.offset;
-        productGO.transform.localRotation = Quaternion.identity;
-        productGO.transform.localScale = Vector3.one;
-    }
-
-    private void UpdatePlacingTriggerAreas(Vector3 position, Quaternion rotation)
-    {
-        BoxCollider collider = productType.prefab.GetComponentInChildren<BoxCollider>();
-        Vector3 center = position + collider.center;
-        Vector3 halfExtents = collider.size / 2.2f;
-        Collider[] hitColliders = Physics.OverlapBox(center, halfExtents, rotation, ShopData.instance.shelfTriggerLayer);
-        
-        for(int i = 0; i < hitColliders.Length; i++) {
-            IPlacingTriggerArea placingTriggerArea = hitColliders[i].GetComponentInParent<IPlacingTriggerArea>();
-            if (placingTriggerArea != null && !placingTriggerAreas.Contains(placingTriggerArea)){
-                placingTriggerAreas.Add(placingTriggerArea);
-            }
-            placingTriggerArea = hitColliders[i].GetComponent<IPlacingTriggerArea>();
-            if (placingTriggerArea != null && !placingTriggerAreas.Contains(placingTriggerArea)) {
-                placingTriggerAreas.Add(placingTriggerArea);
-            }
         }
-    }
+        AudioManager.PlaySound(Sound.ProductPickup, parent.position);
+    }    
 
     public ProductSaveData CreateSaveData()
     {
@@ -102,7 +94,8 @@ public class Product: IPickable
     }
     public void DestroyGameObject()
     {
-        foreach(IPlacingTriggerArea triggerArea in placingTriggerAreas) {
+        vehicleAreasCount = 0;
+        foreach (PlacingTriggerArea triggerArea in placingTriggerAreas) {
             triggerArea.OnProductTakenFromArea(this);
         }
         placingTriggerAreas.Clear();
@@ -111,16 +104,25 @@ public class Product: IPickable
         }
     }
 
-    public void RemoveProductFromGame(bool shouldRemoveFromProductsList)
+    public void RemoveFromGame(bool shouldRemoveFromProductsList)
     {
-        if (productGO != null)
-            GameObject.Destroy(productGO.gameObject);
+        DestroyGameObject();
         if (shouldRemoveFromProductsList && ProductsData.instance.productsSpawned.Contains(this))
             ProductsData.instance.productsSpawned.Remove(this);
     }
 
-    public void SpawnVisualSavePickup(Transform parent)
+    public void OnVehicleAreaEnter()
     {
-        SpawnVisual(parent);
+        if (vehicleAreasCount == 0 && productGO != null && productGO.transform.TryGetComponent(out Rigidbody rb)) {
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+        }
+        vehicleAreasCount++;
     }
+    public void OnVehicleAreaExit()
+    {
+        vehicleAreasCount--;
+        if(vehicleAreasCount == 0 && productGO != null && productGO.transform.TryGetComponent(out Rigidbody rb)) {
+            rb.interpolation = RigidbodyInterpolation.None;
+        }
+    }    
 }

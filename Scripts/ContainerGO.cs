@@ -1,9 +1,11 @@
 using DG.Tweening;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
-public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
+
+public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO, IInformationDisplay
 {
     [SerializeField] bool canBeClosed = false;
     public bool isOpen = false;
@@ -15,31 +17,39 @@ public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
     [SerializeField] private GameObject containerOpenCollider;
     [SerializeField] private GameObject containerClosedCollider;
 
-    [SerializeField] private BoxCollider containerTrigger;
+    public BoxCollider containerTrigger;
     public bool isOpeningOrClosing = false;
 
     [HideInInspector]
     public Container container;
-    public string textToDisplay { 
+    public string InteractionText { 
         get {
             if (!isOpen)
-                return "E - open box";
+                return "F - open box";
             else
-                return "E - close box";
+                return "F - close box";
         } }
+    public int InteractionTextSize => 60;
+
+    public string InformationDisplayText => GetInformationDisplayText();
+
+    public void OnMouseButtoDown() { }
+    public void OnMouseButton() { }
+    public void OnMouseButtonUp() { }
 
     public IPickable pickable => container;
 
+
     public bool isPhysixSpawned;
 
-    public static ContainerGO Spawn(bool isOnlyVisual, Vector3 position, Quaternion rotation, Transform parent, Container container, bool isColliderActive = false)
+    public static ContainerGO Spawn(bool isOnlyVisual, Vector3 position, Quaternion rotation, Transform parent, Container container)
     {
         GameObject containerGO;
         if (isOnlyVisual) {
-            containerGO = Instantiate(container.containerType.visualPrefab, position, rotation, parent);
-            if (isColliderActive) {
-                containerGO.GetComponent<Collider>().enabled = true;
-            }            
+            containerGO = SpawnVisual(container.containerType);
+            containerGO.transform.SetParent(parent);
+            containerGO.transform.position = position;
+            containerGO.transform.rotation = rotation;
         }
         else 
             containerGO = Instantiate(container.containerType.prefab, position, rotation, parent);
@@ -48,6 +58,16 @@ public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
         containerGOScript.Init(false);
         containerGOScript.isPhysixSpawned = !isOnlyVisual;
         return containerGOScript;
+    }
+
+    public static GameObject SpawnVisual(ContainerSO containerType)
+    {
+        GameObject visual = GameObject.Instantiate(containerType.prefab);
+        GameObject.Destroy(visual.GetComponent<Rigidbody>());
+        visual.GetComponentsInChildren<Collider>().ToList().ForEach((col) => Destroy(col));
+        ContainerGO container = visual.GetComponent<ContainerGO>();
+        Destroy(container.containerTrigger);
+        return visual;
     }
 
     public void Init(bool isOpen)
@@ -65,14 +85,18 @@ public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
         foreach(InteractableCollider interactable in interactableColliders)
             interactable.Init(this);
     }
-    public void OnPlayerInteract()
+    public void OnPlayerButtonInteract()
     {
         if (isOpeningOrClosing)
             return;
-        if (isOpen)
+        if (isOpen) {
             CloseContainer();
-        else
+            AudioManager.PlaySound(Sound.BoxOpen, transform.position);
+        }
+        else {
             OpenContainter();
+            AudioManager.PlaySound(Sound.BoxClose, transform.position);
+        }
     }
 
     public void OpenContainter(bool openInstantly = false)
@@ -83,8 +107,13 @@ public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
         for (int i = 0; i < containerDoors.Length; i++) {
             containerDoors[i].transform.DOLocalRotate(containerOpenDoorsRotations[i], localOpeningTime, RotateMode.LocalAxisAdd);
         }
-        StartCoroutine(SetColliderActive(localOpeningTime, true));
+
+        //StartCoroutine(SetColliderActive(localOpeningTime, true));
+
+        isOpen = true;
+        StartCoroutine(OpenContainerCoroutine(localOpeningTime));
     }
+
     public void CloseContainer(bool closeInstantly = false)
     {        
         if (!canBeClosed)
@@ -93,28 +122,57 @@ public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
         for (int i = 0; i < containerDoors.Length; i++) {
             containerDoors[i].transform.DOLocalRotate(-containerOpenDoorsRotations[i], localClosingTime, RotateMode.LocalAxisAdd);
         }
-        StartCoroutine(SetColliderActive(localClosingTime, false));
+
+        //StartCoroutine(SetColliderActive(localClosingTime, false));
+
+        isOpen = false;
+        StartCoroutine(CloseContainerCoroutine(localClosingTime));
     }
 
-    IEnumerator SetColliderActive(float duration, bool desiredState)
+    IEnumerator OpenContainerCoroutine(float duration)
+    {
+        isOpeningOrClosing = true;        
+
+        containerOpenCollider.SetActive(true);
+        containerClosedCollider.SetActive(false);
+        SpawnProducts();
+        yield return new WaitForSeconds(duration);
+        isOpeningOrClosing = false;
+    }
+
+    IEnumerator CloseContainerCoroutine(float duration)
     {
         isOpeningOrClosing = true;
 
-        if (desiredState) {
-            containerOpenCollider.SetActive(true);
-            containerClosedCollider.SetActive(false);
-            SpawnProducts();
-        }
         yield return new WaitForSeconds(duration);
-        isOpen = desiredState;
-        if (!desiredState) {
-            container.UpdateProductsInContainer();
-            container.DestroyProductsInTrigger();
-            containerOpenCollider.SetActive(isOpen);
-            containerClosedCollider.SetActive(!isOpen);
-        }
+
+        container.UpdateProductsInContainer();
+        container.DestroyProductsInTrigger();
+        containerOpenCollider.SetActive(false);
+        containerClosedCollider.SetActive(true);
+
         isOpeningOrClosing = false;
     }
+
+    //IEnumerator SetColliderActive(float duration, bool desiredState)
+    //{
+    //    isOpeningOrClosing = true;
+
+    //    if (desiredState) {
+    //        containerOpenCollider.SetActive(true);
+    //        containerClosedCollider.SetActive(false);
+    //        SpawnProducts();
+    //    }
+    //    yield return new WaitForSeconds(duration);
+    //    isOpen = desiredState;
+    //    if (!desiredState) {
+    //        container.UpdateProductsInContainer();
+    //        container.DestroyProductsInTrigger();
+    //        containerOpenCollider.SetActive(isOpen);
+    //        containerClosedCollider.SetActive(!isOpen);
+    //    }
+    //    isOpeningOrClosing = false;
+    //}
 
     public void GetProductsInTrigger(out List<Product> productsInTriggerList, out List<Vector3> productsInTriggerPositionsList, out List<Vector3> productsInTriggerRotationsList)
     {
@@ -122,8 +180,9 @@ public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
         productsInTriggerPositionsList = new List<Vector3>();
         productsInTriggerRotationsList = new List<Vector3>();
 
-        Vector3 center = transform.position + containerTrigger.center + containerTrigger.transform.localPosition;
-        Vector3 halfExtents = containerTrigger.size / 2f;
+        Vector3 center = transform.position + transform.rotation * (containerTrigger.center +  containerTrigger.transform.localPosition);
+        Vector3 colliderSize = new Vector3(containerTrigger.size.x * containerTrigger.transform.localScale.x, containerTrigger.size.y * containerTrigger.transform.localScale.y, containerTrigger.size.z * containerTrigger.transform.localScale.z);
+        Vector3 halfExtents = colliderSize / 2f;
         Collider[] hitColliders = Physics.OverlapBox(center, halfExtents, transform.rotation, ProductsData.instance.productsLayerMask);
 
         for (int i = 0; i < hitColliders.Length; i++) {
@@ -152,7 +211,41 @@ public class ContainerGO : MonoBehaviour, IInteractable, IPickableGO
         for (int i = 0; i < productsInContainerList.Count; i++) {
             Vector3 position = transform.TransformPoint(productsInContainerPositionsList[i]);
             Quaternion rotation = Quaternion.Euler(transform.eulerAngles + productsInContainerRotationsList[i]);
-            productsInContainerList[i].Place(position, rotation, null);
+
+            if(isPhysixSpawned)            
+                productsInContainerList[i].Place(position, rotation, null, false);
+            else
+                productsInContainerList[i].SpawnVisual(position, rotation, transform);
         }
+    }
+
+    private string GetInformationDisplayText()
+    {
+        List<Product> productsInTriggerList;
+        if (isOpen)
+            GetProductsInTrigger(out productsInTriggerList, out _, out _);
+        else 
+            container.GetProductsInContainerData(out productsInTriggerList, out _, out _);
+       
+        if (productsInTriggerList.Count == 0)
+            return "Empty box";
+        
+        List<ProductSO> productTypesInList = new List<ProductSO>();
+        List<int> count = new List<int>();
+        foreach (Product product in productsInTriggerList) {
+            if (productTypesInList.Contains(product.productType)) {
+                count[productTypesInList.IndexOf(product.productType)]++;
+            }
+            else {
+                productTypesInList.Add(product.productType);
+                count.Add(1);
+            }
+        }
+        string text = "Box:";
+        for (int i = 0;i < productTypesInList.Count;i++) {
+            //text += "\n- " + productTypesInList[i].Name + ": " + count[i];
+            text += "\n- " + count[i] + " " + productTypesInList[i].Name;
+        }
+        return text;
     }
 }

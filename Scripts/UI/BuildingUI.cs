@@ -16,12 +16,13 @@ public class BuildingUI : WindowUI
     [SerializeField] private GameObject selectionListElementPrefab;
 
     [SerializeField] private Button destroyButton;
+    [SerializeField] private Button moveButton;
 
-    private List<GameObject> categoryList = new List<GameObject>();
-    private List<GameObject> selectionListParents = new List<GameObject>();
-    private List<GameObject> selectionList = new List<GameObject>();
+    public List<GameObject> categoryList = new List<GameObject>();
+    public List<GameObject> selectionListParents = new List<GameObject>();
+    public List<GameObject> selectionList = new List<GameObject>();
 
-    private int currentlySelectedCategory = 0;
+    private int currentlySelectedCategory = 1;
 
     public void Init(BuildingManager buildingManager)
     {
@@ -31,21 +32,31 @@ public class BuildingUI : WindowUI
             CloseUI();
             buildingManager.OnDestroyButtonClicked();
         });
+        moveButton.onClick.AddListener(() =>
+        {
+            CloseUI();
+            buildingManager.OnMoveButtonClicked();
+        });
     }
     private void CreateCategoryList()
     {
         DestroyAllElements(categoryList);
-        string[] buildingTypeNames = SOData.GetBuildingTypesNames();
-        for (int i = 0; i < buildingTypeNames.Length; i++) {
+        for (int i = 1; i < buildingManager.buildingCategories.Count; i++) {
             GameObject gameObject = Instantiate(categoryListElementPrefab, categoryListParent);            
             TMP_Text text = gameObject.transform.GetChild(1).GetComponent<TMP_Text>();
             Button button = gameObject.GetComponent<Button>();
             int buttonIndex = i;
             button.onClick.AddListener(() => OnCategoryButtonClicked(buttonIndex));
-            text.text = buildingTypeNames[i];
+            text.text = buildingManager.buildingCategories[i].name;
             gameObject.SetActive(true);
             categoryList.Add(gameObject);
         }
+
+        RectTransform categoryListTransform = categoryListParent.GetComponent<RectTransform>();
+        float width = categoryListTransform.sizeDelta.x;
+        float height = Mathf.Max(8 + (buildingManager.buildingCategories.Count - 1) * 76.5f, 0);
+        categoryListTransform.sizeDelta = new Vector2(width, height);
+        categoryListTransform.localPosition = new Vector2(categoryListTransform.localPosition.x, 0);
     }
 
     private void OnCategoryButtonClicked(int buttonIndex)
@@ -53,7 +64,7 @@ public class BuildingUI : WindowUI
         currentlySelectedCategory = buttonIndex;
         DestroyAllElements(selectionList);
         DestroyAllElements(selectionListParents);
-        IListable[] listables = SOData.GetListables(buttonIndex);
+        IListable[] listables = buildingManager.buildingCategories[buttonIndex].buildings;
 
         int maxElementsInRow = 4;
         GameObject rowParent = null;
@@ -65,8 +76,10 @@ public class BuildingUI : WindowUI
             }
             GameObject listElement = Instantiate(selectionListElementPrefab, rowParent.transform);            
             Button button = listElement.GetComponent<Button>();
-            TMP_Text nameText = listElement.transform.GetChild(1).GetComponent<TMP_Text>();
-            TMP_Text priceText = listElement.transform.GetChild(2).GetComponent<TMP_Text>();
+            Image image = listElement.transform.GetChild(1).GetComponent<Image>();
+            TMP_Text nameText = listElement.transform.GetChild(2).GetComponent<TMP_Text>();
+            TMP_Text priceText = listElement.transform.GetChild(3).GetComponent<TMP_Text>();
+            image.sprite = listables[i].Icon;
             nameText.text = listables[i].Name;
             priceText.text = listables[i].Price + "$";
             selectionList.Add(listElement);
@@ -74,6 +87,14 @@ public class BuildingUI : WindowUI
             int buildingTypeButtonIndex = i;
             button.onClick.AddListener(() => OnSelectionButtonClicked(buildingTypeButtonIndex));
         }
+        RectTransform selectionListTransform = selectionListParent.GetComponent<RectTransform>();
+        float width = selectionListTransform.sizeDelta.x;
+        float height = Mathf.Max(selectionListParents.Count * 210, 0);
+        selectionListTransform.sizeDelta = new Vector2(width, height);
+        selectionListTransform.localPosition = new Vector2(selectionListTransform.localPosition.x, -height / 4);        
+
+        //rectTransform.offsetMin = new Vector2(0, rectTransform.offsetMin.y);
+        //rectTransform.offsetMax = new Vector2(0, rectTransform.offsetMin.y);
     }
 
     private void OnSelectionButtonClicked(int buttonIndex)
@@ -95,19 +116,5 @@ public class BuildingUI : WindowUI
             Destroy(elements[i]);
         }
         elements.Clear();
-    }
-
-    private IListable[] GetListables(int buttonIndex)
-    {
-        switch (buttonIndex) {
-            case 0:
-                return SOData.shelvesList;
-            case 1:
-                return SOData.wallsList;
-            case 2:
-                return SOData.registersList;
-            default:
-                return null;
-        }
     }
 }

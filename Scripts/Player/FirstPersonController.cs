@@ -125,10 +125,12 @@ public class FirstPersonController : MonoBehaviour
 
     #endregion
 
+    private float jumpingCooldown = 0.5f;
+    private float lastJumpTime = 0;
     private void Awake()
     {
         originalScale = transform.localScale;
-        //jointOriginalPos = joint.localPosition;
+        //jointOriginalPos = joint.localPosition;        
     }
 
     void Start()
@@ -275,7 +277,7 @@ public class FirstPersonController : MonoBehaviour
         #region Jump
 
         // Gets input and calls jump method
-        if(enableJump && Input.GetKeyDown(jumpKey) && isGrounded)
+        if(enableJump && Input.GetKeyDown(jumpKey) && isGrounded && Time.time - lastJumpTime >= jumpingCooldown && UIManager.leftPanelUI.currentlyOpenWindow == null)
         {
             Jump();
         }
@@ -315,13 +317,19 @@ public class FirstPersonController : MonoBehaviour
 
     void FixedUpdate()
     {
+        Vector3 gravity = -9.81f * 2f * Vector3.up;
+        rb.AddForce(gravity, ForceMode.Acceleration);
+
         #region Movement
 
         if (playerCanMove)
         {
             // Calculate how fast we should be moving
             Vector3 targetVelocity = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
-
+            if (UIManager.leftPanelUI.currentlyOpenWindow != null)
+                targetVelocity = Vector3.zero;
+            if(targetVelocity.magnitude > 1)
+                targetVelocity.Normalize();
             // Checks if player is walking and isGrounded
             // Will allow head bob
             if (targetVelocity.x != 0 || targetVelocity.z != 0 && isGrounded)
@@ -413,6 +421,7 @@ public class FirstPersonController : MonoBehaviour
         // Adds force to the player rigidbody to jump
         if (isGrounded)
         {
+            lastJumpTime = Time.time;
             rb.AddForce(0f, jumpPower, 0f, ForceMode.Impulse);
             isGrounded = false;
         }

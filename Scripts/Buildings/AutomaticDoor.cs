@@ -12,6 +12,9 @@ public class AutomaticDoor : MonoBehaviour
     [SerializeField] Transform[] doorsOpenTransform;
     [SerializeField] Transform[] doorsClosedTransform;
     [SerializeField] float openingTime = 0.5f;
+
+    [SerializeField] Sound openingSound;
+    [SerializeField] Sound closingSound;
     private void Start()
     {
         DOTween.Init();
@@ -23,6 +26,7 @@ public class AutomaticDoor : MonoBehaviour
 
     private void OpenDoor()
     {
+        AudioManager.PlaySound(openingSound, transform.position);
         for(int i = 0; i < doors.Length; i++) {
             doors[i].transform.DOMove(doorsOpenTransform[i].position, openingTime);
             doors[i].transform.DORotate(doorsOpenTransform[i].eulerAngles, openingTime);
@@ -32,7 +36,8 @@ public class AutomaticDoor : MonoBehaviour
 
     private void CloseDoor()
     {
-        for(int i = 0; i < doors.Length; i++) {
+        AudioManager.PlaySound(closingSound, transform.position);
+        for (int i = 0; i < doors.Length; i++) {
             doors[i].transform.DOMove(doorsClosedTransform[i].position, openingTime);
             doors[i].transform.DORotate(doorsClosedTransform[i].eulerAngles, openingTime);
             doors[i].transform.DOScale(doorsClosedTransform[i].localScale, openingTime);

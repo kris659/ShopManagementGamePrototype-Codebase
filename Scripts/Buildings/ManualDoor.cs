@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+
 public class ManualDoor : MonoBehaviour, IInteractable
 {
     public float openingDuration = 0.5f;
@@ -13,15 +14,24 @@ public class ManualDoor : MonoBehaviour, IInteractable
     Collider[] doorsColliders;
     [SerializeField] Vector3[] doorsRotations;
 
-    public string textToDisplay
+    [SerializeField] Sound doorOpeningSound;
+    [SerializeField] Sound doorClosingSound;
+
+    public void OnMouseButtoDown() { }
+    public void OnMouseButton() { }
+    public void OnMouseButtonUp() { }
+
+    public string InteractionText
     {
         get {
             if (!areDoorsOpen)
-                return "E - open doors";
+                return "F - open doors";
             else
-                return "E - close doors";
+                return "F - close doors";
         }
     }
+    public int InteractionTextSize => 60;
+
 
     private void Start()
     {
@@ -39,7 +49,8 @@ public class ManualDoor : MonoBehaviour, IInteractable
 
     private IEnumerator OpenDoors()
     {
-        for(int i = 0; i < doors.Length; i++) {
+        AudioManager.PlaySound(doorOpeningSound, transform.position);
+        for (int i = 0; i < doors.Length; i++) {
             doors[i].transform.DOLocalRotate(doorsRotations[i], openingDuration);
             doorsColliders[i].isTrigger = true;
         }
@@ -50,6 +61,7 @@ public class ManualDoor : MonoBehaviour, IInteractable
 
     private IEnumerator CloseDoors()
     {
+        AudioManager.PlaySound(doorClosingSound, transform.position);
         for (int i = 0; i < doors.Length; i++) {
             doors[i].transform.DOLocalRotate(Vector3.zero, openingDuration);
             doorsColliders[i].isTrigger = true;
@@ -62,7 +74,7 @@ public class ManualDoor : MonoBehaviour, IInteractable
         areDoorsOpeningOrClosing = false;
     }
 
-    public void OnPlayerInteract()
+    public void OnPlayerButtonInteract()
     {
         if (areDoorsOpeningOrClosing)
             return;

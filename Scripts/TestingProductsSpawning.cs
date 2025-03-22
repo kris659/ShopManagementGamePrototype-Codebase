@@ -20,17 +20,17 @@ public class TestingProductsSpawning : MonoBehaviour
 
     private void Spawn()
     {
-        foreach(Product product in productsSpawned) {
+        foreach (Product product in productsSpawned) {
             product.DestroyGameObject();
         }
         productsSpawned.Clear();
-        ProductsData.instance.GetInTriggerPositions(productsToSpawn, boxCollider, out List<Vector3> positions, true);
-        for(int i = 0; i < positions.Count; i++){
+        ProductsData.instance.GetInTriggerPositions(productsToSpawn, boxCollider, out List<Vector3> positions, 0.003f, true);
+        for (int i = 0; i < positions.Count; i++) {
             int index = SOData.GetProductIndex(productsToSpawn[i]);
             Debug.Log(positions[i]);
             productsSpawned.Add(
                 new Product(index, true, positions[i] + boxCollider.transform.position,
                 Quaternion.identity));
-        }
+        }                
     }
 }

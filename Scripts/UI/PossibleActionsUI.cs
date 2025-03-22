@@ -37,4 +37,12 @@ public class PossibleActionsUI : MonoBehaviour
             }
         }
     }
+
+    public void RemoveAllActions()
+    {
+        for (int i = 0; i < activeElements.Count; i++) {
+            Destroy(activeElements[i].transform.parent.gameObject);
+        }
+        activeElements.Clear();
+    }
 }

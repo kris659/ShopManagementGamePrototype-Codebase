@@ -6,7 +6,7 @@ public class PlayerInteractions : MonoBehaviour
 {
     public static PlayerInteractions Instance;
 
-    [SerializeField] private GameObject mainCamera;
+    public GameObject mainCamera;
     [SerializeField] private GameObject playerCamera;
     [SerializeField] private GameObject vehicleFPSCamera;
     [SerializeField] private GameObject playerRigidbody;
@@ -18,6 +18,7 @@ public class PlayerInteractions : MonoBehaviour
 
     [SerializeField] private float playerInteractionRange;
     [SerializeField] private LayerMask interactionsLayerMask;
+    [SerializeField] private LayerMask informationDisplayLayerMask;
 
     bool isDriving = false;
     IVehicle vehicle;
@@ -42,12 +43,16 @@ public class PlayerInteractions : MonoBehaviour
 
     private string previousActionText;
 
+    private IInteractable currentMouseInteractable;
+    public PlayerPickup playerPickup;
+
     private void Awake()
     {
         if (Instance != null)
             Destroy(this);
         else
             Instance = this;
+        playerPickup = GetComponent<PlayerPickup>();
     }
 
     void Start()
@@ -77,10 +82,9 @@ public class PlayerInteractions : MonoBehaviour
     {
         if (UIManager.BlockInput)
             return;
-        if(Input.GetKeyDown(KeyCode.E))
-            HandleInteractions();
-        if (Input.GetKeyDown(KeyCode.F))
-            HandleInteractions();
+
+        HandleInteractions();
+
         if (Input.GetKeyDown(KeyCode.LeftControl)){
             Cursor.lockState = CursorLockMode.None;
             LockCamera();
@@ -93,42 +97,38 @@ public class PlayerInteractions : MonoBehaviour
             Handle3rdPearsonCamera();
         }
         HandlePossibleInteractions();
+
+        IInformationDisplay informationDisplay = Raycast<IInformationDisplay>(playerInteractionRange, informationDisplayLayerMask, true, true);
+        if(informationDisplay != null)
+            UIManager.informationDisplayUI.UpdateText(informationDisplay.InformationDisplayText);
     }
 
     private void HandleInteractions()
     {
-        //if (isDriving) {
-        //    GetOutOfVehicle();
-        //}
-        //else {
-        //    IInteractable interactable = Raycast<IInteractable>(playerInteractionRange, interactionsLayerMask, true);
-        //    if(interactable != null) {
-        //        interactable.OnPlayerInteract();
-        //        HandlePossibleInteractions();
-        //        return;
-        //    }
-        //    IVehicle vehicle = Raycast<IVehicle>(playerCarInteractionRange, carLayerMask, false);
-        //    if (vehicle != null) {
-        //        if (VehicleManager.instance.IsVehicleUnlocked(vehicle))
-        //            GetInVehicle(vehicle);
-        //        else {
-        //            VehicleManager.instance.TryToUnlockVehicle(vehicle);
-        //        }
-        //    }
-        //}
         if (Input.GetKeyDown(KeyCode.E)) {
-            IInteractable interactable = Raycast<IInteractable>(playerInteractionRange, interactionsLayerMask, true);
-            if (interactable != null) {
-                interactable.OnPlayerInteract();
-                HandlePossibleInteractions();
-                return;
+            if(playerPickup.PickablesAmount > 0 && playerPickup.LastPickable.CanPickableInteract) {
+                playerPickup.LastPickable.OnPickableInteract();
             }
+            //IInteractable interactable = Raycast<IInteractable>(playerInteractionRange, interactionsLayerMask, true);
+            //if (interactable != null) {
+            //    interactable.OnPlayerButtonInteract();
+            //    HandlePossibleInteractions();
+            //    return;
+            //}
         }
-        if(Input.GetKeyDown(KeyCode.F)) {
+        if (Input.GetKeyDown(KeyCode.F)) {
             if (isDriving) {
                 GetOutOfVehicle();
                 return;
             }
+
+            IInteractable interactable = Raycast<IInteractable>(playerInteractionRange, interactionsLayerMask, true);
+            if (interactable != null) {
+                interactable.OnPlayerButtonInteract();
+                HandlePossibleInteractions();
+                return;
+            }
+
             IVehicle vehicle = Raycast<IVehicle>(playerCarInteractionRange, carLayerMask, false);
             if (vehicle != null) {
                 if (VehicleManager.instance.IsVehicleUnlocked(vehicle))
@@ -138,9 +138,22 @@ public class PlayerInteractions : MonoBehaviour
                 }
             }            
         }
+        if(Input.GetMouseButtonDown(0) && !Input.GetMouseButton(1)) {
+            IInteractable interactable = Raycast<IInteractable>(playerInteractionRange, interactionsLayerMask, true);
+            if (interactable != null) {
+                interactable.OnMouseButtoDown();
+                HandlePossibleInteractions();
+                currentMouseInteractable = interactable;
+                return;
+            }
+        }
+        if (Input.GetMouseButtonUp(0) && currentMouseInteractable != null) {
+            currentMouseInteractable.OnMouseButtonUp();
+            currentMouseInteractable = null;
+        }
     }
 
-    private T Raycast<T>(float interactionRange, LayerMask layerMask, bool checkCollider)
+    private T Raycast<T>(float interactionRange, LayerMask layerMask, bool checkCollider, bool searchParent = false)
     {
         Vector3 origin = mainCamera.transform.position;
         Vector3 direction = mainCamera.transform.TransformDirection(Vector3.forward);
@@ -152,6 +165,11 @@ public class PlayerInteractions : MonoBehaviour
             }
             else {
                 if (hit.transform.TryGetComponent(out T component))
+                    return component;
+            }
+            if(searchParent) {
+                T component = hit.transform.GetComponentInParent<T>();
+                if (component != null)
                     return component;
             }
         }
@@ -206,11 +224,11 @@ public class PlayerInteractions : MonoBehaviour
         firstPersonController.enabled = true;
         transform.localScale = Vector3.one;
         vehicle.OnVehicleLeave?.Invoke();
-        playerRigidbody.transform.position = vehicle.GettingOutPosition.position;
+        playerRigidbody.transform.position = vehicle.GettingOutPosition;
         playerRigidbody.SetActive(true);
         playerCamera.transform.rotation = vehicleFPSCamera.transform.rotation;
 
-        playerVirtualCameraPOV.m_HorizontalAxis = vehicleVirtualCameraPOV.m_HorizontalAxis;
+        playerVirtualCameraPOV.m_HorizontalAxis.Value = vehicleVirtualCameraPOV.m_HorizontalAxis.Value + vehicle.Transform.eulerAngles.y;
         playerVirtualCameraPOV.m_VerticalAxis = vehicleVirtualCameraPOV.m_VerticalAxis;
 
         vehicleThirdPersonCamera.m_XAxis.m_MaxSpeed = vehicleThirdPersonHorizontalSpeed;
@@ -235,9 +253,45 @@ public class PlayerInteractions : MonoBehaviour
         playerRigidbody.transform.position = position;
         Physics.SyncTransforms();
     }
+
+    public void LoadFromSaveData(int vehicleIndex)
+    {
+        if (vehicleIndex != -1) {
+            GetInVehicle(VehicleManager.instance.vehiclesSpawned[vehicleIndex]);
+        }
+        else {
+            vehicleController.enabled = false;
+            firstPersonController.enabled = true;
+            vehicle = null;
+            isDriving = false;
+
+            //playerRigidbody.transform.position = vehicle.GettingOutPosition.position;
+            playerRigidbody.SetActive(true);
+            playerCamera.transform.rotation = vehicleFPSCamera.transform.rotation;
+
+            playerVirtualCameraPOV.m_HorizontalAxis = vehicleVirtualCameraPOV.m_HorizontalAxis;
+            playerVirtualCameraPOV.m_VerticalAxis = vehicleVirtualCameraPOV.m_VerticalAxis;
+
+            playerCamera.SetActive(true);
+            vehicleFPSCamera.SetActive(false);
+            mainCamera.transform.GetChild(0).gameObject.SetActive(true);
+        }
+    }
+    
     public Vector3 GetPlayerPosition()
     {
+        if(isDriving && vehicle != null && vehicle.Transform != null) {
+            return vehicle.Transform.position;
+        }
         return playerRigidbody.transform.position;
+    }
+
+    public Vector3 GetPlayerRotation()
+    {
+        if (isDriving && vehicle != null && vehicle.Transform != null) {
+            return vehicle.Transform.eulerAngles;
+        }
+        return mainCamera.transform.eulerAngles;
     }
 
     private void Handle3rdPearsonCamera()
@@ -271,6 +325,7 @@ public class PlayerInteractions : MonoBehaviour
             vehicleThirdPersonCamera.m_YAxis.m_MaxSpeed = 0;
         }
     }
+    
     private void UnlockCamera()
     {
         if (playerVirtualCamera == null)
@@ -280,7 +335,7 @@ public class PlayerInteractions : MonoBehaviour
         vehicleVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed * mouseSensitivity;
         vehicleVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed * mouseSensitivity;
 
-        if (vehicle != null && vehicle.ThirdPersonCamera.activeSelf) {
+        if (vehicle != null && vehicle.ThirdPersonCamera != null && vehicle.ThirdPersonCamera.activeSelf) {
             vehicleThirdPersonCamera.m_XAxis.m_MaxSpeed = vehicleThirdPersonHorizontalSpeed * mouseSensitivity;
             vehicleThirdPersonCamera.m_YAxis.m_MaxSpeed = vehicleThirdPersonVerticalSpeed * mouseSensitivity;
         }
@@ -300,8 +355,9 @@ public class PlayerInteractions : MonoBehaviour
         UIManager.possibleActionsUI.RemoveAction("F - enter the vehicle"); 
         UIManager.possibleActionsUI.RemoveAction("F - unlock the vehicle");
         if (interactable != null) {
-            previousActionText = interactable.textToDisplay;
-            UIManager.possibleActionsUI.AddAction(previousActionText);
+            previousActionText = interactable.InteractionText;
+            if(previousActionText != "")
+                UIManager.possibleActionsUI.AddAction(previousActionText, interactable.InteractionTextSize);
         }
         else {
             IVehicle vehicle = Raycast<IVehicle>(playerCarInteractionRange, carLayerMask, false);
@@ -317,14 +373,14 @@ public class PlayerInteractions : MonoBehaviour
 
     private void OnMouseSensitivityChanged(float value)
     {
-        mouseSensitivity = value + 0.5f;
+        mouseSensitivity = 1f * value + 0.001f;
 
         playerVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed * mouseSensitivity;
         playerVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed * mouseSensitivity;
         vehicleVirtualCameraPOV.m_VerticalAxis.m_MaxSpeed = cameraVerticalSpeed * mouseSensitivity;
         vehicleVirtualCameraPOV.m_HorizontalAxis.m_MaxSpeed = cameraHorizontalSpeed * mouseSensitivity;
 
-        if (vehicle != null && vehicle.ThirdPersonCamera.activeSelf) {
+        if (vehicle != null && vehicle.ThirdPersonCamera != null && vehicle.ThirdPersonCamera.activeSelf) {
             vehicleThirdPersonCamera.m_XAxis.m_MaxSpeed = vehicleThirdPersonHorizontalSpeed * mouseSensitivity;
             vehicleThirdPersonCamera.m_YAxis.m_MaxSpeed = vehicleThirdPersonVerticalSpeed * mouseSensitivity;
         }

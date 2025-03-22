@@ -8,7 +8,6 @@ using UnityEngine.UI;
 public class ManageShopUI : WindowUI
 {
     [SerializeField] private TMP_InputField shopNameInputField;
-    [SerializeField] private TMP_Text maxCustomersText;
     [SerializeField] private Button unlockLandButton;
     [SerializeField] private Button shopOpenButton;
     [SerializeField] private Image openButtonImage;
@@ -17,14 +16,25 @@ public class ManageShopUI : WindowUI
     [SerializeField] private Image buttonOpenPrefab;
     [SerializeField] private Image buttonClosedPrefab;
 
+    [SerializeField] private TMP_Text shopPopularityAlwaysActiveText;
+    [SerializeField] private List<GameObject> popularityCategoriesList;
     public override bool canClose => !shopNameInputField.isFocused;
     private float changeDuration = 0.5f;
 
-    
+    private string[] popularityCategoryNames = new string[6] { 
+        "Shop popularity", 
+        "Shop size", 
+        "Decorations",
+        "Overcrowding",
+        "Customer service",
+        "Products variety"
+    };
+
     internal override void Awake()
     {
         base.Awake();
         shopOpenButton.onClick.AddListener(OnShopOpenButtonClicked);
+        shopNameInputField.onValueChanged.AddListener(ShopData.instance.ChangeShopName);
         DOTween.Init();
         UpdateVisual(true);
     }
@@ -34,7 +44,6 @@ public class ManageShopUI : WindowUI
         UIManager.landUnlockUI.Init(windowsManager.windowsManager);
         unlockLandButton.onClick.AddListener( () => { windowsManager.CloseUI(); UIManager.landUnlockUI.OpenUI(); });
     }
-
 
     private void OnShopOpenButtonClicked()
     {
@@ -46,6 +55,16 @@ public class ManageShopUI : WindowUI
     {
         base.OpenUI();
         UpdateVisual(true);
+    }
+
+    public void UpdatePopularityUI()
+    {
+        List<float> popularityValues = ShopPopularityManager.instance.shopPopularityValues;
+        for (int i = 0; i < popularityValues.Count; i++) {
+            TMP_Text text = popularityCategoriesList[i].GetComponentInChildren<TMP_Text>();
+            text.text = popularityCategoryNames[i] + ": " + popularityValues[i].ToString("0.0").Replace(",", ".") + "/10";
+        }
+        shopPopularityAlwaysActiveText.text = popularityCategoryNames[0] + ": " + popularityValues[0].ToString("0.0").Replace(",", ".") + "/10";
     }
 
     private void UpdateVisual(bool instant = false)
@@ -65,12 +84,8 @@ public class ManageShopUI : WindowUI
             openButtonImage.DOColor(buttonClosedPrefab.color, duration);
             openButtonText.text = "Closed";
         }
-        maxCustomersText.text = "Max customers: " + ShopData.instance.MaxCustomers.ToString();
-    }
+        shopNameInputField.text = ShopData.instance.shopName;
 
-    public override void UpdateOnParentOpen()
-    {
-        base.UpdateOnParentOpen();
-        maxCustomersText.text = "Max customers: " + ShopData.instance.MaxCustomers.ToString();
+        UpdatePopularityUI();
     }
 }

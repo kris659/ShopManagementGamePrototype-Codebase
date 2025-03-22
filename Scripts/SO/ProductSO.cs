@@ -9,17 +9,22 @@ public class ProductSO : ScriptableObject, IListable
     [SerializeField] private string _name;
 
     public GameObject prefab;
-    public GameObject visualPrefab;
+    //public GameObject visualPrefab;
 
-    public Vector3 offset;
-    public Sprite icon;
+    public Vector3 holdingPosition;
+    public Vector3 holdingRotation;
+
+    public Sprite Icon { get { return _icon; } }
+    [SerializeField] private Sprite _icon;
 
     public int Price { get { return _price; } }
     [SerializeField] private int _price;
-    
+
+    public int Popularity { get { return _popularity; } }
+    [SerializeField] private int _popularity;
+
+    public ContainerSO containerType;
+
     public int holdingLimit = 1;
 
-    public bool canBePlacedOnShelf = true;
-    public bool isContainer = false;
-    public bool canBeSold = true;
 }

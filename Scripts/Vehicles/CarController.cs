@@ -3,9 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+
 public class CarController : MonoBehaviour, IInteractable
 {
-    public bool isPlayerInTrigger = false;
     public bool areDoorsOpen = false;
 
     [SerializeField] GameObject leftDoor;
@@ -16,8 +16,12 @@ public class CarController : MonoBehaviour, IInteractable
     [SerializeField] Vector3 leftDoorRotation;
     [SerializeField] Vector3 rightDoorRotation;
 
-    public string textToDisplay { get; } = "E - open doors";
+    public string InteractionText { get; } = "F - Open doors";
+    public int InteractionTextSize => 60;
 
+    public void OnMouseButtoDown() { }
+    public void OnMouseButton() { }
+    public void OnMouseButtonUp() { }
 
     private void Start()
     {
@@ -45,7 +49,7 @@ public class CarController : MonoBehaviour, IInteractable
         rightDoorCollider.enabled = true;
     }
 
-    public void OnPlayerInteract()
+    public void OnPlayerButtonInteract()
     {
         if(areDoorsOpen)
             CloseDoors();

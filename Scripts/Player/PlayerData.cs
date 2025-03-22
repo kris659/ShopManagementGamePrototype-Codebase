@@ -1,16 +1,17 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class PlayerData : MonoBehaviour
 {
-    private PlayerInteractions playerInteractions;
-    private PlayerPickup playerPickup;
-    [SerializeField] private int playerStartingMoney;
-
     public static PlayerData instance;
+
+
+    private PlayerInteractions playerInteractions;
+    [HideInInspector]
+    public PlayerPickup playerPickup;
+    [SerializeField] private int playerStartingMoney;
     public event Action<float> OnPlayerMoneyChanged;
 
     public float playerMoney { 
@@ -33,13 +34,25 @@ public class PlayerData : MonoBehaviour
         playerMoney = playerStartingMoney;
     }
 
-    public void AddMoney(float moneyAmount)
+    private void Update()
     {
+        if (Input.GetKey(KeyCode.LeftBracket) && Input.GetKey(KeyCode.RightBracket)) {
+            AddMoney(1000, false);
+        }
+    }
+
+    public void AddMoney(float moneyAmount, bool shoudProgressTaskEarnMoney)
+    {
+        if (moneyAmount < 0)
+            Debug.LogError("Use TakeMoney for negative $");
         playerMoney += moneyAmount;
+        if(shoudProgressTaskEarnMoney)
+            TasksManager.instance.ProgressTasks(TaskType.EarnMoney, Mathf.RoundToInt(moneyAmount));
     }
     public void TakeMoney(float moneyAmount)
     {
         playerMoney -= moneyAmount;
+        TasksManager.instance.ProgressTasks(TaskType.SpendMoney, Mathf.RoundToInt(moneyAmount));
     }
     public bool CanAfford(float moneyAmount)
     {
@@ -58,13 +71,17 @@ public class PlayerData : MonoBehaviour
     {
         playerMoney = saveData.playerMoney;
         playerInteractions.SetPlayerPosition(saveData.position);
-        if (saveData.vehicleIndex != -1)
-            playerInteractions.GetInVehicle(VehicleManager.instance.vehiclesSpawned[saveData.vehicleIndex]);
-        playerPickup.LoadFromSaveData(saveData.pickedupProducts, saveData.pickedupContainers);
+        playerInteractions.LoadFromSaveData(saveData.vehicleIndex);        
+        playerPickup.LoadFromSaveData(saveData.pickablesTypeID, saveData.pickableID);
     }
 
     public void ClearScene()
     {
         playerPickup.ClearPickupList();
+    }
+
+    public void OnDumpsterUsed()
+    {
+        playerPickup.OnDumpsterUsed();
     }
 }

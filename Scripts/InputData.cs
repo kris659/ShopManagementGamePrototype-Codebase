@@ -12,6 +12,8 @@ public struct InputData
     public bool buttonF;
     public bool buttonQ;
     public bool buttonR;
+    public bool buttonH;
+    public bool buttonL;
     public bool buttonJump;
 
     public bool buttonZ;

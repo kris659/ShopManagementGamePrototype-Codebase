@@ -63,5 +63,8 @@ public class LandUnlockUI : WindowUI
     {
         PlayerData.instance.TakeMoney(unlockPrices[buttonIndex]);
         ShopData.instance.floorsToUnlock[buttonIndex].SetActive(true);
+        ShopPopularityManager.instance.UpdatePopularity(ShopPopularityCategory.ShopSize, ShopData.instance.GetUnlockedLandsCount() + 1);
+        AudioManager.PlaySound(Sound.PlayerOrder);
+        TasksManager.instance.ProgressTasks(TaskType.UnlockLand, 1);
     }
 }

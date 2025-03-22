@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
 using System.Linq;
+using System;
 
 public static class SaveFilesManager
 {
@@ -87,14 +88,21 @@ public static class SaveFilesManager
         return loadedData;
     }
 
-    public static List<string> GetSaveFileNames()
+    public static void GetSaveFilesData(out List<string> saveNames, out List<DateTime> lastWriteTime)
     {
-        if(!Directory.Exists(saveDirectoryPath)) return new List<string>();
+        saveNames = new List<string>();
+        lastWriteTime = new List<DateTime>();
+
+        if (!Directory.Exists(saveDirectoryPath))
+            return;
 
         DirectoryInfo directoryInfo = new DirectoryInfo(saveDirectoryPath);
-        FileInfo[] files = directoryInfo.GetFiles().OrderBy(p => p.CreationTime).Reverse().ToArray();
-        List<string> fileNames = new List<string>();
-        for (int i = 0; i < files.Length; i++) fileNames.Add(files[i].Name);
-        return fileNames;
+        FileInfo[] files = directoryInfo.GetFiles().OrderBy(p => p.LastWriteTime).Reverse().ToArray();
+        
+        for (int i = 0; i < files.Length; i++) {
+            saveNames.Add(files[i].Name);
+            lastWriteTime.Add(files[i].LastWriteTime);
+        }
+        return;
     } 
 }

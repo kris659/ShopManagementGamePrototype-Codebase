@@ -44,6 +44,7 @@ public class CarPhysx : MonoBehaviour
 
     private Rigidbody rb;
     private LiftController liftController;
+    private VehicleAudio audioController;
 
     Vector2 currentInput;
     Vector3 previousCarPosition;
@@ -57,6 +58,7 @@ public class CarPhysx : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         liftController = GetComponent<LiftController>();
+        audioController = GetComponent<VehicleAudio>();
 
         previousCarPosition = transform.position;
     }
@@ -83,6 +85,7 @@ public class CarPhysx : MonoBehaviour
 
                     if (Mathf.Abs(carSpeed) <= 0.5f) dragForce *= 2;
                     if (Mathf.Abs(carSpeed) <= 0.1f) dragForce *= 5;
+                    if (Mathf.Abs(carSpeed) >= 7.5f) dragForce /= 2;
                 }
                 if(!isPlayerControlling || currentInput.y == 0 && Mathf.Abs(carSpeed) <= 0.2f) {
                     suspensionForce.x = 0;
@@ -120,6 +123,7 @@ public class CarPhysx : MonoBehaviour
         }
 
         if (liftController != null) liftController.HandleInput(data.buttonE || data.buttonCapsLock, data.buttonQ || data.buttonShift);
+        if (audioController != null) audioController.HandleVehicleAudio(100 + Mathf.Abs(Vector3.Dot(transform.forward, rb.velocity) / _carTopSpeed * 4900));
     }
 
     void RotateFrontWheels()
@@ -173,7 +177,7 @@ public class CarPhysx : MonoBehaviour
         float brakingBonus = 1;
 
         //Debug.Log("input: " + vertical);
-        Debug.Log("Car speed: " + carSpeed);
+        //Debug.Log("Car speed: " + carSpeed);
         
         if (vertical == 0)
         {
@@ -185,6 +189,7 @@ public class CarPhysx : MonoBehaviour
 
             if (Mathf.Abs(carSpeed) <= 0.5f) dragForce *= 2;
             if (Mathf.Abs(carSpeed) <= 0.1f) dragForce *= 5;
+            if (Mathf.Abs(carSpeed) >= 7.5f) dragForce /= 2;
 
             return dragForce;
         }

@@ -6,12 +6,20 @@ public class LeftPanelUI : WindowsUIManager
 {
     [SerializeField] private ConfirmUI confirmUI;
     [SerializeField] private PauseMenuUI pauseMenuUI;
+    [SerializeField] private NextDayUI nextDayUI;
+    [SerializeField] private InfoUI infoUI;
+    [SerializeField] private InputFieldUI inputFieldUI;
+    [SerializeField] private FurnitureShopUI furnitureShopUI;
 
     internal override void Awake()
     {
         base.Awake();
         confirmUI.Init(this);
         pauseMenuUI.Init(this);
+        nextDayUI.Init(this);
+        infoUI.Init(this);
+        inputFieldUI.Init(this);
+        furnitureShopUI.Init(this);
     }
 
     internal override void Update()
@@ -22,7 +30,8 @@ public class LeftPanelUI : WindowsUIManager
                 currentlyOpenWindow.CloseUI();
             }
             else {
-                pauseMenuUI.OpenUI();
+                if(!MainMenu.isMainMenuOpen && !BuildingManager.instance.IsBuilding && !BuildingManager.instance.isRemovingBuildings)
+                    pauseMenuUI.OpenUI();
             }
         }
     }

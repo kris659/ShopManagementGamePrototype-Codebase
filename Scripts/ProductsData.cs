@@ -1,9 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 
-public class ProductsData : MonoBehaviour, IPlacingTriggerArea
+public class ProductsData : MonoBehaviour
 {
     [System.Serializable]
     public struct ProductsCategory
@@ -11,22 +12,41 @@ public class ProductsData : MonoBehaviour, IPlacingTriggerArea
         public string name;
         public ProductSO[] products;
     }
-    [SerializeField] private List<ProductsCategory> productsCategories;
+    [System.Serializable]
+    public struct LicenseData
+    {
+        public string name;
+        public bool isUnlockedOnStart;
+        public int unlockPrice;
+        public ProductSO[] products;
+    }
+
+    public static ProductsData instance;
+
+    [SerializeField] public List<ProductsCategory> productsCategories;
+    [SerializeField] public List<LicenseData> productsLicenses;
+    [SerializeField] public List<bool> unlockedProductsLicenses;
     [SerializeField] private bool shouldSpawnOnSpawn = true;
     [SerializeField] private List<Transform> startingSpawnProductPositions = new List<Transform>();
     [SerializeField] private List<Transform> startingSpawnContainerPositions = new List<Transform>();
     [SerializeField] private List<int> startingSpawnProductTypes = new List<int>();
     [SerializeField] private List<int> startingSpawnContainerTypes = new List<int>();
 
-    public static ProductsData instance;
     public List<Product> productsSpawned = new List<Product>();
     public List<Container> containersSpawned = new List<Container>();
+    public List<FurnitureBox> furnitureBoxesSpawned = new List<FurnitureBox>();
 
-    public List<Product> productsInShop = new List<Product>();
-    public List<Container> containersInShop = new List<Container>();
+    public List<Product> ProductsInShop => placingTriggerAreaParent.products;
+    public List<Container> ContainersInShop => placingTriggerAreaParent.containers;
 
     public LayerMask productsLayerMask;
 
+    public List<Product> productsOnShelves = new List<Product>();
+    public int[] productsOnShelvesCount;
+    public int differentProductTypesOnShelvesCount;
+    public int totalProductsTypeCount;
+
+    PlacingTriggerAreaParent placingTriggerAreaParent;
     private void Awake()
     {
         if (instance != null) {
@@ -35,68 +55,206 @@ public class ProductsData : MonoBehaviour, IPlacingTriggerArea
         }
         instance = this;
 
-        TriggerHandler triggerHandler = GetComponentInChildren<TriggerHandler>();
-        triggerHandler.triggerEnter += EnterShopArea;
-        triggerHandler.triggerExit += LeaveShopArea;
+        placingTriggerAreaParent = GetComponent<PlacingTriggerAreaParent>();
+
+        placingTriggerAreaParent.OnProductTriggerEnterEvent += OnProductPlacedInArea;
+        placingTriggerAreaParent.OnProductTriggerExitEvent += OnProductTakenFromArea;
+
+        placingTriggerAreaParent.OnContainerTriggerEnterEvent += OnContainerPlacedInArea;
+        placingTriggerAreaParent.OnContainerTriggerExitEvent += OnContainerTakenFromArea;
+
+        totalProductsTypeCount = 0;
+        foreach(LicenseData licenseData in productsLicenses) {
+            totalProductsTypeCount += licenseData.products.Length;
+        }
     }
 
-    public Container GetContainerForRestocker()
-    {
-        foreach(Container container in containersInShop) {
-            if(!container.isContainerOnShelf)
-                return container;
+    public void OnProductPlacedOnShelf(Product product) {
+        if (!productsOnShelves.Contains(product)) {
+            productsOnShelves.Add(product);
+            productsOnShelvesCount[product.productTypeIndex]++;
+            if (productsOnShelvesCount[product.productTypeIndex] == 1) {
+                differentProductTypesOnShelvesCount++;
+                TasksManager.instance.ProgressTasks(TaskType.HaveDifferentProducts, differentProductTypesOnShelvesCount);
+            }
         }
+    }
+
+    public void OnProductTakenFromShelf(Product product) {
+        if (productsOnShelves.Contains(product)) {
+            productsOnShelves.Remove(product);
+            productsOnShelvesCount[product.productTypeIndex]--;
+            if (productsOnShelvesCount[product.productTypeIndex] == 0) {
+                differentProductTypesOnShelvesCount--;
+                TasksManager.instance.ProgressTasks(TaskType.HaveDifferentProducts, differentProductTypesOnShelvesCount);
+            }
+        }
+    }
+
+    public bool IsProductsUnlocked(int productIndex)
+    {
+        return IsProductsUnlocked(SOData.productsList[productIndex]);
+    }
+    public bool IsProductsUnlocked(ProductSO productSO)
+    {
+        for (int i = 0; i < unlockedProductsLicenses.Count; i++) {
+            if (unlockedProductsLicenses[i] && productsLicenses[i].products.Contains(productSO))
+                return true;
+        }
+        return false;
+    }
+
+    public int GetRandomProduct()
+    {
+        int productsCount = 0;
+        for(int i = 0; i < unlockedProductsLicenses.Count; i++) {
+            if (unlockedProductsLicenses[i])
+                productsCount += productsLicenses[i].products.Length;
+        }
+        int index = Random.Range(0, productsCount);
+        ProductSO product = null;
+        for (int i = 0; i < unlockedProductsLicenses.Count; i++) {
+            if (unlockedProductsLicenses[i]) {
+                if (index >= productsLicenses[i].products.Length)
+                    index -= productsLicenses[i].products.Length;
+                else {
+                    product = productsLicenses[i].products[index];
+                    break;
+                }
+
+            }
+        }
+        return SOData.GetProductIndex(product);
+    }
+
+    public void OnProductPlacedInArea(Product product){  }
+
+    public void OnProductTakenFromArea(Product product){  }
+
+    public void OnContainerPlacedInArea(Container container) {  }
+
+    public void OnContainerTakenFromArea(Container container) {  }
+
+    public IPickable GetPickableByID(int pickableTypeID, int pickableID)
+    {       
+        if(pickableTypeID >= 0 && pickableTypeID < 999 && productsSpawned.Count > pickableID)
+            return productsSpawned[pickableID];
+        if (pickableTypeID < 0 && containersSpawned.Count > pickableID)
+            return containersSpawned[pickableID];
+        if (pickableTypeID == 999 && furnitureBoxesSpawned.Count > pickableID)
+            return furnitureBoxesSpawned[pickableID];
+
+        Debug.LogError("Pickable NOT FOUND! TypeID: " + pickableTypeID + " ID: " + pickableID);
         return null;
     }
 
-    public void OnProductPlacedInArea(Product product){ }
 
-    public void OnProductTakenFromArea(Product product){ }
-
-    public void OnContainerPlacedInArea(Container container) {
-        if (!containersInShop.Contains(container)) {
-            Debug.Log("Container placed in area");
-            containersInShop.Add(container);
-        }
-    }
-
-    public void OnContainerTakenFromArea(Container container) {
-        if (containersInShop.Contains(container)) {
-            Debug.Log("Container taken from area");
-            containersInShop.Remove(container);
-        }
-    }
-
-    private void EnterShopArea(Collider other)
+    public string[] GetCategoryNames()
     {
-        if (other.gameObject.name != "ContainerTrigger")
-            return;
-        if (other.transform.parent != null && other.transform.parent.TryGetComponent(out ContainerGO containerGO)) {
-            if (!containerGO.container.placingTriggerAreas.Contains(this))
-                containerGO.container.placingTriggerAreas.Add(this);
-            OnContainerPlacedInArea(containerGO.container);
+        string[] categoryNames = new string[productsCategories.Count];
+
+        for(int i = 0; i < categoryNames.Length; i++) {
+            categoryNames[i] = productsCategories[i].name;
         }
+        return categoryNames;
     }
-    private void LeaveShopArea(Collider other)
+
+    public ProductSO[] GetCategoryProducts(int categoryIndex)
     {
-        if (other.gameObject.name != "ContainerTrigger")
+        if (unlockedProductsLicenses[categoryIndex]) {
+            return productsLicenses[categoryIndex].products;
+        }
+        return new ProductSO[0];
+    }
+
+    public void GetInTriggerPositions(ProductSO productType, BoxCollider boxCollider, out List<Vector3> positions, bool allowMultipleLevels, float spaceBeetween = 0.003f, bool prioritizeRows = false)
+    {
+        List<ProductSO> products = Enumerable.Repeat(productType, 100).ToList();
+        GetInTriggerPositions(products, boxCollider, out positions, spaceBeetween, prioritizeRows);
+
+        if (!allowMultipleLevels)
             return;
-        if (other.transform.parent != null && other.transform.parent.TryGetComponent(out ContainerGO containerGO)) {
-            if (containerGO.container.placingTriggerAreas.Contains(this))
-                containerGO.container.placingTriggerAreas.Remove(this);
-            else {
-                Debug.LogError("Sus");
+
+        BoxCollider productCollider = productType.prefab.GetComponentInChildren<BoxCollider>();
+
+        float colliderHeight = productCollider.size.y;
+        float currentHeight = colliderHeight;
+        float boxHeight = boxCollider.size.y * boxCollider.transform.localScale.y;
+        int initialListSize = positions.Count;
+
+        while (currentHeight + colliderHeight < boxHeight) {
+            for (int i = 0; i < initialListSize; i++) {
+                positions.Add(positions[positions.Count - initialListSize] + new Vector3(0, colliderHeight, 0));
             }
-            OnContainerTakenFromArea(containerGO.container);
+            currentHeight += colliderHeight;
         }
+    }
+
+    public void GetInTriggerPositions(List<Product> products, BoxCollider boxCollider, out List<Vector3> positions, float spaceBeetween = 0.003f, bool prioritizeRows = false)
+    {
+        List<ProductSO> productSOs = new List<ProductSO>();
+        foreach(Product product in products) {
+            productSOs.Add(product.productType);
+        }
+        GetInTriggerPositions(productSOs, boxCollider, out positions, spaceBeetween, prioritizeRows);
+    }
+
+    public void GetInTriggerPositions(List<ProductSO> products, BoxCollider boxCollider, out List<Vector3> positions, float spaceBeetween = 0.003f, bool prioritizeRows = false)
+    {
+        Vector3 maxPosition = new Vector3(boxCollider.size.x * boxCollider.transform.localScale.x, 0, boxCollider.size.z * boxCollider.transform.localScale.z);
+        if(!prioritizeRows) {
+            maxPosition = new Vector3(maxPosition.z, 0, maxPosition.x);
+        }
+        Vector3 currentPosition = Vector3.zero;
+        Vector3 offset = new Vector3(boxCollider.size.x * boxCollider.transform.localScale.x / 2, 0, boxCollider.size.z * boxCollider.transform.localScale.z / 2);
+        positions = new List<Vector3>();
+        float nextPositionZ = 0;
+        for(int i = 0; i < products.Count; i++) {
+            BoxCollider productCollider = products[i].prefab.GetComponentInChildren<BoxCollider>();
+            float x = productCollider.size.x + spaceBeetween;
+            float z = productCollider.size.z + spaceBeetween;
+            if(!prioritizeRows) {
+                x = productCollider.size.z + spaceBeetween;
+                z = productCollider.size.x + spaceBeetween;
+            }
+
+            if(currentPosition.x + x > maxPosition.x) { // Next row
+                currentPosition.x = 0;
+                currentPosition.z += nextPositionZ;
+                nextPositionZ = 0;
+            }
+            if(currentPosition.z + z < maxPosition.z) {                
+                if (prioritizeRows)
+                    positions.Add(currentPosition + new Vector3(x / 2, 0, z / 2) - offset);
+                else
+                    positions.Add(new Vector3(currentPosition.z + z / 2, 0, currentPosition.x + x / 2) - offset);
+                currentPosition.x += x;
+                nextPositionZ = Mathf.Max(nextPositionZ, z);
+            }
+            else {                
+                if(positions.Count == 0) {
+                    Debug.Log("To big to spawn");                    
+                }
+                return;
+            }
+        }
+    }
+
+    public void OnUnlockLicenseButtonPressed(int licenseIndex)
+    {
+        if (!PlayerData.instance.CanAfford(productsLicenses[licenseIndex].unlockPrice))
+            return;
+        PlayerData.instance.TakeMoney(productsLicenses[licenseIndex].unlockPrice);
+        unlockedProductsLicenses[licenseIndex] = true;
     }
 
     public ProductSaveData[] GetProductsSaveData()
     {
         ProductSaveData[] productsSaveData = new ProductSaveData[productsSpawned.Count];
 
-        for(int i = 0; i < productsSaveData.Length; i++) {
-            if (productsSpawned[i].isTakenByCustomer || productsSpawned[i].isInClosedContainer) continue;
+        for (int i = 0; i < productsSaveData.Length; i++) {
+            if (productsSpawned[i].isTakenByCustomer || productsSpawned[i].isInClosedContainer)
+                continue;
             productsSaveData[i] = productsSpawned[i].CreateSaveData();
         }
         return productsSaveData;
@@ -107,24 +265,41 @@ public class ProductsData : MonoBehaviour, IPlacingTriggerArea
         ContainerSaveData[] containersSaveData = new ContainerSaveData[containersSpawned.Count];
 
         for (int i = 0; i < containersSaveData.Length; i++) {
-            if (productsSpawned[i].isTakenByCustomer || productsSpawned[i].isInClosedContainer) 
-                continue;
             containersSaveData[i] = containersSpawned[i].CreateSaveData();
         }
         return containersSaveData;
     }
 
-    public void LoadFromSaveData(ProductSaveData[] productsSaveData, ContainerSaveData[] containersSaveData)
+    public FurnitureBoxSaveData[] GetFurnitureBoxSaveData()
     {
-        for(int i = 0;i < productsSaveData.Length; i++) {
+        FurnitureBoxSaveData[] furnitureBoxSaveData = new FurnitureBoxSaveData[furnitureBoxesSpawned.Count];
+
+        for (int i = 0; i < furnitureBoxSaveData.Length; i++) {
+            furnitureBoxSaveData[i] = furnitureBoxesSpawned[i].CreateSaveData();
+        }
+        return furnitureBoxSaveData;
+    }
+
+    public void LoadFromSaveData(ProductSaveData[] productsSaveData, ContainerSaveData[] containersSaveData, FurnitureBoxSaveData[] furnitureBoxSaveData)
+    {
+        productsOnShelvesCount = new int[SOData.productsList.Length];
+        differentProductTypesOnShelvesCount = 0;
+        productsOnShelves.Clear();
+        if (furnitureBoxSaveData == null) {
+            furnitureBoxSaveData = new FurnitureBoxSaveData[0];
+        }
+        for (int i = 0; i < furnitureBoxSaveData.Length; i++) {
+            new FurnitureBox(furnitureBoxSaveData[i].buildingSaveData, furnitureBoxSaveData[i].isPhysxSpawned, furnitureBoxSaveData[i].position, furnitureBoxSaveData[i].rotation);
+        }
+        for (int i = 0; i < productsSaveData.Length; i++) {
             new Product(productsSaveData[i].productTypeIndex, productsSaveData[i].isPhysxSpawned, productsSaveData[i].position, productsSaveData[i].rotation);
         }
-        for(int i = 0; i < containersSaveData.Length; i++) {
-            List<Product> productsInContainer = new List<Product>(); 
-            List<Vector3> productsPositions = new List<Vector3>(); 
+        for (int i = 0; i < containersSaveData.Length; i++) {
+            List<Product> productsInContainer = new List<Product>();
+            List<Vector3> productsPositions = new List<Vector3>();
             List<Vector3> productsRotations = new List<Vector3>();
 
-            for(int j = 0; j < containersSaveData[i].productsInContainerIndexes.Length; j++) {
+            for (int j = 0; j < containersSaveData[i].productsInContainerIndexes.Length; j++) {
                 productsInContainer.Add(productsSpawned[containersSaveData[i].productsInContainerIndexes[j]]);
                 productsPositions.Add(containersSaveData[i].productsInContainerPositions[j]);
                 productsRotations.Add(containersSaveData[i].productsInContainerRotations[j].eulerAngles);
@@ -142,80 +317,36 @@ public class ProductsData : MonoBehaviour, IPlacingTriggerArea
         }
     }
 
-    public string[] GetCategoryNames()
+    public void LoadSaveUnlockedLicenses(bool[] saveData)
     {
-        string[] categoryNames = new string[productsCategories.Count];
-
-        for(int i = 0; i < categoryNames.Length; i++) {
-            categoryNames[i] = productsCategories[i].name;
+        unlockedProductsLicenses = new List<bool>();
+        int i = 0;
+        if (saveData != null) {
+            for (; i < saveData.Length; i++) {
+                unlockedProductsLicenses.Add(saveData[i]);
+            }
         }
-        return categoryNames;
-    }
 
-    public ProductSO[] GetCategoryProducts(int categoryIndex)
-    {
-        return productsCategories[categoryIndex].products;
-    }
-
-    public void GetInTriggerPositions(List<Product> products, BoxCollider boxCollider, out List<Vector3> positions, bool prioritizeRows)
-    {
-        List<ProductSO> productSOs = new List<ProductSO>();
-        foreach(Product product in products) {
-            productSOs.Add(product.productType);
-        }
-        GetInTriggerPositions(productSOs, boxCollider, out positions, prioritizeRows);
-    }
-
-    public void GetInTriggerPositions(List<ProductSO> products, BoxCollider boxCollider, out List<Vector3> positions, bool prioritizeRows)
-    {
-        Vector3 maxPosition = new Vector3(boxCollider.size.x * boxCollider.transform.localScale.x, 0, boxCollider.size.z * boxCollider.transform.localScale.z);
-        if(!prioritizeRows) {
-            maxPosition = new Vector3(maxPosition.z, 0, maxPosition.x);
-        }
-        Vector3 currentPosition = Vector3.zero;
-        positions = new List<Vector3>();
-        float nextPositionZ = 0;
-        for(int i = 0; i < products.Count; i++) {
-            BoxCollider productCollider = products[i].prefab.GetComponentInChildren<BoxCollider>();
-            float x = productCollider.size.x;
-            float z = productCollider.size.z;
-            if(!prioritizeRows ) {
-                x = productCollider.size.z;
-                z = productCollider.size.x;
-            }
-
-            if(currentPosition.x + x > maxPosition.x) { // Next row
-                currentPosition.x = 0;
-                currentPosition.z += nextPositionZ;
-                nextPositionZ = 0;
-            }
-            if(currentPosition.z + z < maxPosition.z) {                
-                if (prioritizeRows)
-                    positions.Add(currentPosition + new Vector3(x / 2, 0, z / 2));
-                else
-                    positions.Add(new Vector3(currentPosition.z + z / 2, 0, currentPosition.x + z / 2));
-                currentPosition.x += x;
-                nextPositionZ = Mathf.Max(nextPositionZ, z);
-            }
-            else {                
-                if(positions.Count == 0) {
-                    Debug.Log("To big to spawn");                    
-                    //positions.Add(new Vector3(0, 0, 0));
-                }
-                return;
-            }
+        for (; i < productsLicenses.Count; i++) {
+            unlockedProductsLicenses.Add(productsLicenses[i].isUnlockedOnStart);
         }
     }
 
     public void DestroyAll()
     {
         for(int i = 0; i < productsSpawned.Count; i++)
-            productsSpawned[i].RemoveProductFromGame(false);
+            productsSpawned[i].RemoveFromGame(false);
         for (int i = 0; i < containersSpawned.Count; i++)
-            containersSpawned[i].RemoveProductFromGame(false);
+            containersSpawned[i].RemoveFromGame(false);
+        for (int i = 0; i < furnitureBoxesSpawned.Count; i++)
+            furnitureBoxesSpawned[i].RemoveFromGame(false);
         productsSpawned.Clear();
         containersSpawned.Clear();
-        productsInShop.Clear();
-        containersInShop.Clear();
+        furnitureBoxesSpawned.Clear();
+        ProductsInShop.Clear();
+        ContainersInShop.Clear();
+        productsOnShelvesCount = new int[SOData.productsList.Length];
+        differentProductTypesOnShelvesCount = 0;
+        productsOnShelves.Clear();
     }
 }

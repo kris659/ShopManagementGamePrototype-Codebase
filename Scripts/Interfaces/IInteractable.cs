@@ -1,9 +1,11 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
 
 public interface IInteractable
 {
-    public void OnPlayerInteract();
-    public string textToDisplay { get; }
+    public void OnPlayerButtonInteract();
+    public string InteractionText { get; }
+    public int InteractionTextSize { get; }
+
+    public void OnMouseButtoDown();
+    public void OnMouseButton();
+    public void OnMouseButtonUp();
 }

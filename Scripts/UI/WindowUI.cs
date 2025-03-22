@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class WindowUI: MonoBehaviour
 {
-    private GameObject UIGameObject;
+    internal GameObject UIGameObject;
     public bool isOpen { get { return UIGameObject.activeSelf; } }
     public virtual bool canClose { get { return true; } }
 
@@ -22,7 +22,7 @@ public class WindowUI: MonoBehaviour
     public virtual void OpenUI()
     {
         if(windowsManager != null) {
-            if (windowsManager.currentlyOpenWindow != null)
+            if (windowsManager.currentlyOpenWindow != null && windowsManager.currentlyOpenWindow != this)
                 windowsManager.currentlyOpenWindow.CloseUI();
             windowsManager.currentlyOpenWindow = this;
         }
@@ -34,7 +34,8 @@ public class WindowUI: MonoBehaviour
     {
         UIGameObject.SetActive(false);
         PlayerInteractions.Instance.UnlockCameraForUI();
-        Cursor.lockState = CursorLockMode.Locked;
+        if(!MainMenu.isMainMenuOpen)
+            Cursor.lockState = CursorLockMode.Locked;
         if(windowsManager != null) {
             windowsManager.currentlyOpenWindow = null;
         }
